@@ -9,7 +9,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <!-- Supabase Client -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
 
 <style>
 /* ══════════════════════════════════════════════════════
@@ -321,6 +321,7 @@ tbody tr:hover { background: var(--s1); }
 }
 </style>
 
+<base target="_blank">
 </head>
 <body>
 
@@ -425,7 +426,15 @@ if (SUPABASE_URL === 'https://seu-projeto.supabase.co') {
   alert('⚠️ CONFIGURE AS CREDENCIAIS DO SUPABASE NO CÓDIGO!')
 }
 
-window.supabase = window.supabase || supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+// CORREÇÃO: Verificar se o Supabase carregou corretamente (UMD via unpkg)
+if (typeof supabase === 'undefined' || !supabase.createClient) {
+  console.error('❌ Supabase client não carregou! Verifique a conexão com a internet.')
+  logDebug('ERRO: Supabase client não carregou (file:// bloqueia CDN)')
+  document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;"><h2>⚠️ Erro de Carregamento</h2><p>O Supabase não pôde ser carregado porque você está abrindo este arquivo localmente (<code>file://</code>).</p><p><strong>Soluções:</strong></p><ol style="text-align:left;max-width:500px;margin:20px auto;"><li>Use um servidor local: <code>npx serve .</code> ou <code>python -m http.server 8080</code></li><li>Ou abra via VS Code com Live Server</li><li>Ou hospede em um servidor web</li></ol></div>'
+  throw new Error('Supabase not loaded')
+}
+
+window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
@@ -437,6 +446,9 @@ window.supabase = window.supabase || supabase.createClient(SUPABASE_URL, SUPABAS
     }
   }
 })
+
+// Alias global para compatibilidade
+window.supabase = window.supabaseClient
 
 // ═══════════════════════════════════════════════════════
 // AUTH HANDLERS
@@ -454,7 +466,7 @@ $('loginForm').addEventListener('submit', async (e) => {
 
   setLoading(true)
   try {
-    const { data, error } = await window.supabase.auth.signInWithPassword({
+    const { data, error } = await window.supabaseClient.auth.signInWithPassword({
       email: email,
       password: password
     })
@@ -481,7 +493,7 @@ $('btnLogout')?.addEventListener('click', async () => {
       window._studyChannel.unsubscribe()
       window._studyChannel = null
     }
-    await window.supabase.auth.signOut()
+    await window.supabaseClient.auth.signOut()
     showToast('Logout realizado', 'success')
   } catch(e) {
     console.error('[LOGOUT] Erro:', e)
@@ -502,7 +514,7 @@ window._fetchStudies = async function() {
   try {
     console.log('[FETCH] Buscando estudos para plant_id:', window._currentPlantId)
 
-    const { data, error } = await window.supabase
+    const { data, error } = await window.supabaseClient
       .from('studies')
       .select('*')
       .eq('plant_id', window._currentPlantId)
@@ -526,7 +538,7 @@ window._fetchStudies = async function() {
 
 window._fetchPlants = async function() {
   try {
-    const { data, error } = await window.supabase
+    const { data, error } = await window.supabaseClient
       .from('plants')
       .select('*')
       .order('name')
@@ -653,7 +665,7 @@ window._subscribeToStudies = function() {
   const channelName = `studies:plant:${window._currentPlantId}`
   console.log('[REALTIME] Subscrevendo canal:', channelName)
 
-  window._studyChannel = window.supabase
+  window._studyChannel = window.supabaseClient
     .channel(channelName)
     .on(
       'postgres_changes',
@@ -690,7 +702,7 @@ window._subscribeToStudies = function() {
 // Flag para prevenir race conditions
 let _authHandling = false
 
-window.supabase.auth.onAuthStateChange((event, session) => {
+window.supabaseClient.auth.onAuthStateChange((event, session) => {
   console.log('[AUTH EVENT]', event, session?.user?.email)
   logDebug(`Auth event: ${event} | User: ${session?.user?.email || 'none'}`)
 
@@ -724,7 +736,7 @@ async function handleSignIn(session) {
     window._currentUser = session.user
 
     // CORREÇÃO CRÍTICA #2: Buscar dados do usuário COM tratamento de erros completo
-    const { data: userData, error: userError } = await window.supabase
+    const { data: userData, error: userError } = await window.supabaseClient
       .from('users')
       .select('*')
       .eq('id', session.user.id)
@@ -741,7 +753,7 @@ async function handleSignIn(session) {
         showToast('Erro ao carregar dados do usuário: ' + userError.message, 'error')
       }
 
-      await window.supabase.auth.signOut()
+      await window.supabaseClient.auth.signOut()
       _authHandling = false
       return
     }
@@ -750,7 +762,7 @@ async function handleSignIn(session) {
       console.warn('⚠️ Usuário não encontrado na tabela users')
       logDebug('Usuário autenticado mas NÃO encontrado em public.users')
       showToast('Usuário não configurado. Contate o administrador.', 'error')
-      await window.supabase.auth.signOut()
+      await window.supabaseClient.auth.signOut()
       _authHandling = false
       return
     }
@@ -800,7 +812,7 @@ async function handleSignIn(session) {
     logDebug(`ERRO CRÍTICO: ${e.message}`)
     showToast('Erro crítico: ' + e.message, 'error')
     try {
-      await window.supabase.auth.signOut()
+      await window.supabaseClient.auth.signOut()
     } catch(signOutErr) {
       console.error('[AUTH] Erro ao fazer signOut:', signOutErr)
     }
@@ -863,7 +875,7 @@ async function initApp() {
   logDebug('Inicializando app...')
 
   try {
-    const { data: { session }, error } = await window.supabase.auth.getSession()
+    const { data: { session }, error } = await window.supabaseClient.auth.getSession()
 
     if (error) {
       console.error('[INIT] Erro ao verificar sessão:', error)
@@ -898,7 +910,7 @@ if (document.readyState === 'loading') {
 }
 
 console.log('═══════════════════════════════════════════════════════')
-console.log('🚀 SaaS CP/CPK SUPABASE — CORRIGIDO E OTIMIZADO v2.0')
+console.log('🚀 SaaS CP/CPK SUPABASE — CORRIGIDO E OTIMIZADO v2.1')
 console.log('═══════════════════════════════════════════════════════')
 </script>
 
