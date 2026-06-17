@@ -319,6 +319,36 @@ tbody tr:hover { background: var(--s1); }
   max-height: 200px;
   margin: 0;
 }
+
+/* ─── RLS ERROR PANEL ─── */
+.rls-error-box {
+  background: var(--fail-l);
+  border: 1px solid var(--fail-b);
+  border-radius: 8px;
+  padding: 20px;
+  margin: 16px 0;
+  color: var(--t0);
+}
+.rls-error-box h3 {
+  margin: 0 0 12px 0;
+  color: var(--fail);
+  font-size: 16px;
+}
+.rls-error-box pre {
+  background: var(--s0);
+  padding: 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 12px;
+  border: 1px solid var(--s3);
+}
+.rls-error-box code {
+  background: var(--s2);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Geist Mono', monospace;
+  font-size: 12px;
+}
 </style>
 
 <base target="_blank">
@@ -368,6 +398,9 @@ tbody tr:hover { background: var(--s1); }
       <div id="studiesList" style="min-height: 200px;"></div>
     </div>
 
+    <!-- RLS Error Panel -->
+    <div id="rlsErrorPanel" style="display: none;"></div>
+
     <!-- Debug Panel (visível apenas em desenvolvimento) -->
     <div class="debug-panel" id="debugPanel" style="display: none;">
       <h4>🔧 Diagnóstico de Integração</h4>
@@ -412,6 +445,85 @@ function logDebug(info) {
   const timestamp = new Date().toLocaleTimeString()
   content.textContent = existing + `[${timestamp}] ${info}\n`
   content.scrollTop = content.scrollHeight
+}
+
+function showRLSError(error) {
+  const panel = $('rlsErrorPanel')
+  if (!panel) return
+
+  let title = 'Erro de Configuração'
+  let message = error.message || 'Erro desconhecido'
+  let sql = ''
+
+  if (error.code === '42P17') {
+    title = '⚠️ Recursão Infinita na Política RLS'
+    message = 'A política RLS da tabela <code>users</code> está causando recursão infinita. A política não pode consultar a própria tabela <code>users</code> dentro de si mesma.'
+    sql = `-- Execute no SQL Editor do Supabase para corrigir:
+
+-- 1. Remover políticas antigas (se existirem)
+DROP POLICY IF EXISTS "Users read own data" ON public.users;
+DROP POLICY IF EXISTS "Studies by plant" ON public.studies;
+DROP POLICY IF EXISTS "Plants readable" ON public.plants;
+
+-- 2. Habilitar RLS
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.studies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.plants ENABLE ROW LEVEL SECURITY;
+
+-- 3. Política CORRETA para users (sem subquery na própria tabela)
+CREATE POLICY "Users read own data"
+  ON public.users
+  FOR SELECT
+  TO authenticated
+  USING (auth.uid() = id);
+
+-- 4. Política para studies (usando variável de sessão ou campo direto)
+CREATE POLICY "Studies by plant"
+  ON public.studies
+  FOR ALL
+  TO authenticated
+  USING (plant_id IN (
+    SELECT plant_id FROM public.users WHERE id = auth.uid()
+  ))
+  WITH CHECK (plant_id IN (
+    SELECT plant_id FROM public.users WHERE id = auth.uid()
+  ));
+
+-- 5. Política para plants
+CREATE POLICY "Plants readable"
+  ON public.plants
+  FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- 6. Garantir que o usuário existe em public.users
+INSERT INTO public.users (id, email, plant_id, role)
+VALUES (
+  'UUID-DO-USUARIO-AQUI',
+  'ra.admin@rochling.com',
+  1,
+  'admin'
+)
+ON CONFLICT (id) DO UPDATE SET plant_id = 1, role = 'admin';`
+  } else if (error.code === '42501' || error.message?.includes('permission denied')) {
+    title = '⚠️ Permissão Negada (RLS)'
+    message = 'O usuário autenticado não tem permissão para acessar esta tabela. Verifique se as políticas RLS estão configuradas corretamente.'
+    sql = `-- Execute no SQL Editor do Supabase:
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users read own data"
+  ON public.users FOR SELECT TO authenticated
+  USING (auth.uid() = id);`
+  }
+
+  panel.innerHTML = `
+    <div class="rls-error-box">
+      <h3>${title}</h3>
+      <p>${message}</p>
+      <p style="margin-top:8px;color:var(--t2);font-size:13px;">Código do erro: <code>${error.code || 'N/A'}</code></p>
+      ${sql ? `<p style="margin-top:12px;font-weight:600;">Copie e execute este SQL no Supabase:</p><pre>${sql}</pre>` : ''}
+    </div>
+  `
+  show(panel)
 }
 
 // ═══════════════════════════════════════════════════════
@@ -746,9 +858,14 @@ async function handleSignIn(session) {
       console.error('[AUTH] Erro ao buscar usuário:', userError)
       logDebug(`ERRO users table: ${userError.message}\nCode: ${userError.code}`)
 
+      // Mostrar erro RLS específico na interface
+      showRLSError(userError)
+
       // Se for erro de permissão (RLS), mostrar mensagem específica
       if (userError.code === '42501' || userError.message?.includes('permission denied')) {
         showToast('Erro de permissão: verifique as políticas RLS da tabela users', 'error')
+      } else if (userError.code === '42P17') {
+        showToast('Erro RLS: recursão infinita detectada. Corrija as políticas no Supabase.', 'error')
       } else {
         showToast('Erro ao carregar dados do usuário: ' + userError.message, 'error')
       }
@@ -857,6 +974,9 @@ async function handleSignOut() {
   hide($('btnNewStudy'))
   hide($('btnAdminPanel'))
 
+  // Esconder painel de erro RLS
+  hide($('rlsErrorPanel'))
+
   logDebug('Usuário deslogado')
 }
 
@@ -910,7 +1030,7 @@ if (document.readyState === 'loading') {
 }
 
 console.log('═══════════════════════════════════════════════════════')
-console.log('🚀 SaaS CP/CPK SUPABASE — CORRIGIDO E OTIMIZADO v2.1')
+console.log('🚀 SaaS CP/CPK SUPABASE — CORRIGIDO E OTIMIZADO v2.2')
 console.log('═══════════════════════════════════════════════════════')
 </script>
 
