@@ -90,7 +90,7 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/@supabase/supabase-js@2.39.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
 
 <script>
 'use strict';
@@ -104,16 +104,20 @@ var allStudies = [];
 
 function $(id) { return document.getElementById(id); }
 
-// Inicializar Supabase com delay para garantir carregamento da biblioteca
-setTimeout(function() {
+// Loop de retry para aguardar Supabase carregar
+var supabaseRetry = 0;
+function initSupabase() {
+  supabaseRetry++;
+  console.log('[DB] Tentativa ' + supabaseRetry + ' de carregar Supabase...');
+  
   if (window.supabase && window.supabase.createClient) {
     try {
       supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      console.log('[DB] ✅ Supabase inicializado');
+      console.log('[DB] ✅ Supabase inicializado com sucesso!');
       
       // Monitorar estado de autenticação
       supabase.auth.onAuthStateChange(function(event, session) {
-        console.log('[AUTH] Evento:', event, 'Session:', !!session);
+        console.log('[AUTH] Evento:', event, 'Autenticado:', !!session?.user);
         var gate = $('authGate');
         var app = document.querySelector('.app');
         var badge = $('userBadge');
@@ -133,12 +137,19 @@ setTimeout(function() {
         }
       });
     } catch (err) {
-      console.error('[DB] ❌ Erro:', err.message);
+      console.error('[DB] ❌ Erro ao inicializar:', err.message);
     }
+  } else if (supabaseRetry < 15) {
+    console.log('[DB] ⏳ Aguardando biblioteca... (' + supabaseRetry + '/15)');
+    setTimeout(initSupabase, 300);
   } else {
-    console.warn('[DB] ⏳ Biblioteca Supabase não carregada ainda');
+    console.error('[DB] ❌ Falha ao carregar Supabase após 15 tentativas');
+    $('loginError').textContent = '❌ Erro: Biblioteca não carregou. Recarregue a página.';
   }
-}, 1500);
+}
+
+// Iniciar após 500ms para garantir que script foi parseado
+setTimeout(initSupabase, 500);
 
 // APIs
 window.DB = {
@@ -200,20 +211,28 @@ window.AUTH = {
 // UI
 window.handleLogin = async function(e) {
   e.preventDefault();
+  var errorDiv = $('loginError');
   
   if (!supabase) {
-    $('loginError').textContent = '⏳ Sistema ainda inicializando... tente novamente';
+    errorDiv.textContent = '⏳ Sistema ainda inicializando... aguarde 3 segundos e tente novamente';
+    console.warn('[LOGIN] Supabase não disponível ainda');
     return;
   }
   
   try {
-    $('loginError').textContent = '⏳ Autenticando...';
-    await window.AUTH.login($('loginEmail').value, $('loginPassword').value);
-    $('loginError').textContent = '';
+    errorDiv.textContent = '⏳ Autenticando...';
+    var email = $('loginEmail').value;
+    var password = $('loginPassword').value;
+    
+    console.log('[LOGIN] Tentando autenticar:', email);
+    await window.AUTH.login(email, password);
+    
+    errorDiv.textContent = '';
     $('loginForm').reset();
+    console.log('[LOGIN] ✅ Autenticação bem-sucedida');
   } catch (err) {
-    console.error('[LOGIN] Erro:', err);
-    $('loginError').textContent = '❌ Erro: ' + (err.message || 'Falha na autenticação');
+    console.error('[LOGIN] ❌ Erro:', err.message);
+    errorDiv.textContent = '❌ Erro: ' + (err.message || 'Falha na autenticação');
   }
 };
 
