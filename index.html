@@ -274,8 +274,11 @@ function initSupabaseClient() {
       },
       currentUser: function() {
         return currentSession ? currentSession.user : null;
-      }
+      },
+      client: null /* será atribuído logo abaixo */
     };
+    window.AUTH.client = supabaseClient;
+    window.supabaseClient = supabaseClient;
     
     console.log('[SB] ✓ window.AUTH exposto e pronto para usar.');
 
@@ -295,17 +298,55 @@ function initSupabaseClient() {
 
       if (session && session.user) {
         console.log('[SB] 📥 Carregando perfil para:', session.user.email);
-        currentProfile = await fetchUserProfile(session.user.id);
-        
-        if (!currentProfile) {
-          console.error('[SB] ❌ PROBLEMA: Perfil não foi carregado!');
-          console.log('[SB] ℹ️ Verifique se a tabela "profiles" tem dados para este usuário.');
-          console.log('[SB] SQL para verificar:');
-          console.log('SELECT * FROM profiles WHERE id = ' + "'" + session.user.id + "'" + ';');
-          return;
+        try {
+          // ⏱️ Timeout para evitar deadlock dentro do onAuthStateChange.
+          // Se a consulta ao profile não responder em 3s, seguimos com defaults.
+          currentProfile = await Promise.race([
+            fetchUserProfile(session.user.id),
+            new Promise(function(resolve){
+              setTimeout(function(){
+                console.warn('[SB] ⏱️ Timeout (3s) ao buscar perfil. Seguindo com defaults.');
+                resolve(null);
+              }, 3000);
+            })
+          ]);
+        } catch (e) {
+          console.warn('[SB] ⚠️ Erro ao buscar perfil, seguindo com defaults:', e);
+          currentProfile = null;
         }
-        
-        currentPlant   = currentProfile ? currentProfile.plants : null;
+
+        if (!currentProfile) {
+          console.warn('[SB] ⚠️ Perfil não encontrado na tabela "profiles". Aplicando defaults temporários para não bloquear o Dashboard.');
+          currentProfile = { role: 'user', plants: { code: 'Padrão', language_code: 'pt-BR' } };
+        }
+
+        currentPlant = currentProfile.plants || { code: 'Padrão', language_code: 'pt-BR' };
+        window.currentPlant   = currentPlant;
+        window.currentProfile = currentProfile;
+
+        // ── Carregar role da tabela user_roles ──
+        try {
+          var rr = await supabaseClient.from('user_roles').select('role').eq('user_id', session.user.id);
+          var roles = (rr && rr.data) ? rr.data.map(function(x){return x.role;}) : [];
+          currentProfile.role = roles.indexOf('admin') >= 0 ? 'admin' : 'user';
+          currentProfile.roles = roles;
+        } catch(e){ currentProfile.role = 'user'; }
+
+        // ── Aplicar i18n com base na planta ──
+        try { if (typeof applyI18n === 'function') applyI18n(currentPlant.language_code || 'pt-BR'); } catch(e){}
+
+        // ── Mostrar aba Admin e seletor de planta se for admin ──
+        try {
+          var navAdm = document.getElementById('navAdminTab');
+          var sw     = document.getElementById('adminPlantSwitcher');
+          if (currentProfile.role === 'admin') {
+            if (navAdm) navAdm.style.display = '';
+            if (sw)     { sw.style.display = ''; if (typeof loadPlantSwitcher === 'function') loadPlantSwitcher(); }
+          } else {
+            if (navAdm) navAdm.style.display = 'none';
+            if (sw)     sw.style.display = 'none';
+          }
+        } catch(e){ console.warn('[SB] admin UI toggle falhou', e); }
 
         console.log('[SB] ✓ Auth:', session.user.email,
           '| Role:', currentProfile ? currentProfile.role : '?',
@@ -1996,15 +2037,19 @@ body.has-custom-branding #printPageHeader .cph-std{
   <nav class="topbar-tabs">
     <button class="nav-tab active" onclick="showPage('dashboard',this)">
       <svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor"><path d="M1 1h5v6H1V1zm7 0h4v3H8V1zM1 9h5v3H1V9zm7-3h4v6H8V6z"/></svg>
-      Dashboard
+      <span data-i18n="nav.dashboard">Dashboard</span>
     </button>
     <button class="nav-tab" onclick="newStudy(this)">
       <svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor"><path d="M1 10h2V7H1v3zm3 0h2V4H4v6zm3 0h2V1H7v9zm3 0h2V5h-2v5z"/></svg>
-      Novo Estudo
+      <span data-i18n="nav.new">Novo Estudo</span>
     </button>
     <button class="nav-tab" onclick="showPage('studies',this)">
       <svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor"><path d="M2 2h9v1H2V2zm0 3h9v1H2V5zm0 3h6v1H2V8zm0 3h4v1H2v-1z"/></svg>
-      Estudos Salvos
+      <span data-i18n="nav.studies">Estudos Salvos</span>
+    </button>
+    <button id="navAdminTab" class="nav-tab" style="display:none" onclick="showPage('admin',this)">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor"><path d="M6.5 1l1.5 3 3.5.5-2.5 2.5.5 3.5L6.5 9 3 10.5l.5-3.5L1 4.5l3.5-.5L6.5 1z"/></svg>
+      <span data-i18n="nav.admin">⚙ Admin</span>
     </button>
   </nav>
 
@@ -2044,6 +2089,7 @@ body.has-custom-branding #printPageHeader .cph-std{
       ⬆️ Restaurar
     </button>
     <input type="file" id="importBackupInput" accept="application/json,.json" style="display:none" onchange="importBackup(this)">
+    <select id="adminPlantSwitcher" onchange="onAdminSwitchPlant(this.value)" title="Trocar planta em visualização" style="display:none;font-size:11px;padding:4px 8px;border:1px solid var(--s3);border-radius:6px;background:var(--s0);color:var(--t1);font-weight:600;margin-left:4px"></select>
     <span id="userBadge" style="display:none;font-size:11.5px;color:var(--t2);font-weight:600;padding:0 8px;border-left:1px solid var(--s3);margin-left:4px"></span>
     <button class="btn btn-ghost btn-sm" onclick="openBrandingModal()" title="Logotipo e dados da empresa para impressão / PDF">
       🏢 Empresa
@@ -2793,6 +2839,107 @@ body.has-custom-branding #printPageHeader .cph-std{
 </div><!-- page-analysis -->
 
 <!-- ══════════════════════════════════════════════════════
+     PAGE: ADMIN (visível só para role=admin)
+══════════════════════════════════════════════════════ -->
+<div class="page" id="page-admin">
+  <div style="max-width:1200px;margin:0 auto;padding:24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div>
+        <h2 style="font-size:20px;font-weight:700;color:var(--t0);margin:0" data-i18n="admin.title">⚙ Administração</h2>
+        <p style="font-size:12px;color:var(--t2);margin:4px 0 0" data-i18n="admin.subtitle">Gerenciar plantas e usuários do sistema</p>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:6px;border-bottom:1px solid var(--s3);margin-bottom:18px">
+      <button class="adm-tab adm-tab-active" data-admtab="plants" onclick="switchAdmTab('plants')" data-i18n="admin.tab.plants">🏭 Plantas</button>
+      <button class="adm-tab" data-admtab="users"  onclick="switchAdmTab('users')"  data-i18n="admin.tab.users">👥 Usuários</button>
+    </div>
+
+    <!-- ─── PLANTS ─── -->
+    <section id="admSecPlants">
+      <div style="background:var(--s0);border:1px solid var(--s3);border-radius:10px;padding:18px;margin-bottom:18px;box-shadow:var(--sh)">
+        <h3 style="font-size:14px;font-weight:700;color:var(--t0);margin:0 0 12px" data-i18n="admin.plants.new">Nova planta</h3>
+        <div style="display:grid;grid-template-columns:1fr 2fr 1fr 1fr auto;gap:10px;align-items:end">
+          <div><label style="font-size:11px;color:var(--t2);font-weight:600" data-i18n="admin.plants.code">Código</label><input id="newPlantCode" placeholder="MATRIZ" style="width:100%"></div>
+          <div><label style="font-size:11px;color:var(--t2);font-weight:600" data-i18n="admin.plants.name">Nome</label><input id="newPlantName" placeholder="Matriz Brasil" style="width:100%"></div>
+          <div><label style="font-size:11px;color:var(--t2);font-weight:600" data-i18n="admin.plants.country">País</label><input id="newPlantCountry" placeholder="BR" style="width:100%"></div>
+          <div><label style="font-size:11px;color:var(--t2);font-weight:600" data-i18n="admin.plants.lang">Idioma</label>
+            <select id="newPlantLang" style="width:100%">
+              <option value="pt-BR">pt-BR · Português (BR)</option>
+              <option value="es-MX">es-MX · Español (MX)</option>
+              <option value="en-US">en-US · English (US)</option>
+              <option value="de-DE">de-DE · Deutsch</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="adminCreatePlant()" data-i18n="admin.plants.create">+ Criar planta</button>
+        </div>
+      </div>
+      <div style="background:var(--s0);border:1px solid var(--s3);border-radius:10px;padding:18px;box-shadow:var(--sh)">
+        <h3 style="font-size:14px;font-weight:700;color:var(--t0);margin:0 0 12px" data-i18n="admin.plants.list">Plantas cadastradas</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead>
+            <tr style="background:var(--s2);text-align:left">
+              <th style="padding:8px" data-i18n="admin.plants.code">Código</th>
+              <th style="padding:8px" data-i18n="admin.plants.name">Nome</th>
+              <th style="padding:8px" data-i18n="admin.plants.country">País</th>
+              <th style="padding:8px" data-i18n="admin.plants.lang">Idioma</th>
+              <th style="padding:8px;text-align:right" data-i18n="admin.actions">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="admPlantsRows"><tr><td colspan="5" style="padding:14px;color:var(--t3);text-align:center" data-i18n="common.loading">Carregando…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ─── USERS ─── -->
+    <section id="admSecUsers" style="display:none">
+      <div style="background:var(--s0);border:1px solid var(--s3);border-radius:10px;padding:18px;margin-bottom:18px;box-shadow:var(--sh)">
+        <h3 style="font-size:14px;font-weight:700;color:var(--t0);margin:0 0 12px" data-i18n="admin.users.new">Novo usuário</h3>
+        <div style="display:grid;grid-template-columns:1.4fr 1.4fr 1fr 1fr 0.8fr auto;gap:10px;align-items:end">
+          <div><label style="font-size:11px;color:var(--t2);font-weight:600" data-i18n="admin.users.email">E-mail</label><input id="newUserEmail" type="email" placeholder="nome@empresa.com" style="width:100%"></div>
+          <div><label style="font-size:11px;color:var(--t2);font-weight:600" data-i18n="admin.users.name">Nome completo</label><input id="newUserName" placeholder="Fulano de Tal" style="width:100%"></div>
+          <div><label style="font-size:11px;color:var(--t2);font-weight:600" data-i18n="admin.users.pwd">Senha</label><input id="newUserPwd" type="text" placeholder="mín. 8 caracteres" style="width:100%"></div>
+          <div><label style="font-size:11px;color:var(--t2);font-weight:600" data-i18n="admin.users.plant">Planta</label><select id="newUserPlant" style="width:100%"></select></div>
+          <div><label style="font-size:11px;color:var(--t2);font-weight:600" data-i18n="admin.users.role">Papel</label>
+            <select id="newUserRole" style="width:100%">
+              <option value="user">user</option>
+              <option value="admin">admin</option>
+            </select>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="adminCreateUser()" data-i18n="admin.users.create">+ Criar usuário</button>
+        </div>
+        <div id="admUserMsg" style="margin-top:10px;font-size:12px"></div>
+      </div>
+      <div style="background:var(--s0);border:1px solid var(--s3);border-radius:10px;padding:18px;box-shadow:var(--sh)">
+        <h3 style="font-size:14px;font-weight:700;color:var(--t0);margin:0 0 12px" data-i18n="admin.users.list">Usuários cadastrados</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead>
+            <tr style="background:var(--s2);text-align:left">
+              <th style="padding:8px" data-i18n="admin.users.name">Nome</th>
+              <th style="padding:8px" data-i18n="admin.users.email">E-mail</th>
+              <th style="padding:8px" data-i18n="admin.users.plant">Planta</th>
+              <th style="padding:8px" data-i18n="admin.users.role">Papel</th>
+              <th style="padding:8px;text-align:right" data-i18n="admin.actions">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="admUsersRows"><tr><td colspan="5" style="padding:14px;color:var(--t3);text-align:center" data-i18n="common.loading">Carregando…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>
+
+<style>
+.adm-tab{background:none;border:none;padding:10px 16px;font-size:13px;font-weight:600;color:var(--t2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.adm-tab:hover{color:var(--t1)}
+.adm-tab-active{color:var(--blue);border-bottom-color:var(--blue)}
+#page-admin label{display:block;margin-bottom:4px}
+#page-admin input,#page-admin select{padding:7px 10px;border:1px solid var(--s3);border-radius:6px;font-size:12.5px;background:var(--s0);color:var(--t1)}
+#page-admin table th{font-weight:700;color:var(--t1);border-bottom:1px solid var(--s3)}
+#page-admin table td{padding:8px;border-bottom:1px solid var(--s2)}
+</style>
+
+<!-- ══════════════════════════════════════════════════════
      PAGE: STUDIES
 ══════════════════════════════════════════════════════ -->
 <div class="page" id="page-studies">
@@ -2931,6 +3078,7 @@ function showPage(id, btn){
   if(btn) btn.classList.add('active');
   if(id==='studies') renderStudiesList();
   if(id==='dashboard') renderDashboard();
+  if(id==='admin' && typeof renderAdminPage==='function') renderAdminPage();
 }
 
 /* ═══════════════════════════════════════════════
@@ -6249,5 +6397,279 @@ renderDashboard();
   else document.addEventListener('DOMContentLoaded', loadCompanyFromSupabase);
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════
+     I18N + ADMIN PANEL (v1_8)
+══════════════════════════════════════════════════════ -->
+<script>
+(function(){
+  // ── Dicionário de tradução ──────────────────────────
+  // Para adicionar idioma: copie o bloco 'pt-BR' e traduza os valores.
+  var I18N = {
+    'pt-BR': {
+      'nav.dashboard':'Dashboard',
+      'nav.new':'Novo Estudo',
+      'nav.studies':'Estudos Salvos',
+      'nav.admin':'⚙ Admin',
+      'common.loading':'Carregando…',
+      'common.save':'Salvar','common.cancel':'Cancelar','common.delete':'Excluir',
+      'common.edit':'Editar','common.confirm':'Confirmar',
+      'admin.title':'⚙ Administração',
+      'admin.subtitle':'Gerenciar plantas e usuários do sistema',
+      'admin.tab.plants':'🏭 Plantas','admin.tab.users':'👥 Usuários',
+      'admin.plants.new':'Nova planta','admin.plants.list':'Plantas cadastradas',
+      'admin.plants.code':'Código','admin.plants.name':'Nome',
+      'admin.plants.country':'País','admin.plants.lang':'Idioma',
+      'admin.plants.create':'+ Criar planta',
+      'admin.users.new':'Novo usuário','admin.users.list':'Usuários cadastrados',
+      'admin.users.email':'E-mail','admin.users.name':'Nome completo',
+      'admin.users.pwd':'Senha','admin.users.plant':'Planta','admin.users.role':'Papel',
+      'admin.users.create':'+ Criar usuário',
+      'admin.actions':'Ações'
+    },
+    'es-MX': {
+      'nav.dashboard':'Tablero','nav.new':'Nuevo Estudio','nav.studies':'Estudios Guardados','nav.admin':'⚙ Admin',
+      'common.loading':'Cargando…','common.save':'Guardar','common.cancel':'Cancelar','common.delete':'Eliminar',
+      'common.edit':'Editar','common.confirm':'Confirmar',
+      'admin.title':'⚙ Administración','admin.subtitle':'Gestionar plantas y usuarios del sistema',
+      'admin.tab.plants':'🏭 Plantas','admin.tab.users':'👥 Usuarios',
+      'admin.plants.new':'Nueva planta','admin.plants.list':'Plantas registradas',
+      'admin.plants.code':'Código','admin.plants.name':'Nombre','admin.plants.country':'País','admin.plants.lang':'Idioma',
+      'admin.plants.create':'+ Crear planta',
+      'admin.users.new':'Nuevo usuario','admin.users.list':'Usuarios registrados',
+      'admin.users.email':'Correo','admin.users.name':'Nombre completo','admin.users.pwd':'Contraseña',
+      'admin.users.plant':'Planta','admin.users.role':'Rol','admin.users.create':'+ Crear usuario',
+      'admin.actions':'Acciones'
+    },
+    'en-US': {
+      'nav.dashboard':'Dashboard','nav.new':'New Study','nav.studies':'Saved Studies','nav.admin':'⚙ Admin',
+      'common.loading':'Loading…','common.save':'Save','common.cancel':'Cancel','common.delete':'Delete',
+      'common.edit':'Edit','common.confirm':'Confirm',
+      'admin.title':'⚙ Administration','admin.subtitle':'Manage plants and users',
+      'admin.tab.plants':'🏭 Plants','admin.tab.users':'👥 Users',
+      'admin.plants.new':'New plant','admin.plants.list':'Registered plants',
+      'admin.plants.code':'Code','admin.plants.name':'Name','admin.plants.country':'Country','admin.plants.lang':'Language',
+      'admin.plants.create':'+ Create plant',
+      'admin.users.new':'New user','admin.users.list':'Registered users',
+      'admin.users.email':'Email','admin.users.name':'Full name','admin.users.pwd':'Password',
+      'admin.users.plant':'Plant','admin.users.role':'Role','admin.users.create':'+ Create user',
+      'admin.actions':'Actions'
+    },
+    'de-DE': {
+      'nav.dashboard':'Übersicht','nav.new':'Neue Studie','nav.studies':'Gespeicherte Studien','nav.admin':'⚙ Admin',
+      'common.loading':'Lädt…','common.save':'Speichern','common.cancel':'Abbrechen','common.delete':'Löschen',
+      'common.edit':'Bearbeiten','common.confirm':'Bestätigen',
+      'admin.title':'⚙ Verwaltung','admin.subtitle':'Werke und Benutzer verwalten',
+      'admin.tab.plants':'🏭 Werke','admin.tab.users':'👥 Benutzer',
+      'admin.plants.new':'Neues Werk','admin.plants.list':'Registrierte Werke',
+      'admin.plants.code':'Code','admin.plants.name':'Name','admin.plants.country':'Land','admin.plants.lang':'Sprache',
+      'admin.plants.create':'+ Werk anlegen',
+      'admin.users.new':'Neuer Benutzer','admin.users.list':'Registrierte Benutzer',
+      'admin.users.email':'E-Mail','admin.users.name':'Vollständiger Name','admin.users.pwd':'Passwort',
+      'admin.users.plant':'Werk','admin.users.role':'Rolle','admin.users.create':'+ Benutzer anlegen',
+      'admin.actions':'Aktionen'
+    }
+  };
+
+  var currentLang = 'pt-BR';
+  function t(key){
+    var d = I18N[currentLang] || I18N['pt-BR'];
+    return (d && d[key]) || (I18N['pt-BR'][key]) || key;
+  }
+  function applyI18n(lang){
+    if (lang && I18N[lang]) currentLang = lang;
+    document.querySelectorAll('[data-i18n]').forEach(function(el){
+      var k = el.getAttribute('data-i18n');
+      if (k) el.textContent = t(k);
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el){
+      var k = el.getAttribute('data-i18n-placeholder');
+      if (k) el.setAttribute('placeholder', t(k));
+    });
+    document.documentElement.setAttribute('lang', currentLang);
+  }
+  window.t = t;
+  window.applyI18n = applyI18n;
+
+  // ── Helpers de Supabase ────────────────────────────
+  function sb(){ return window.AUTH && window.AUTH.client ? window.AUTH.client : null; }
+  // Expor o client se ainda não estiver
+  if (window.AUTH && !window.AUTH.client) {
+    // tenta capturar do closure do init principal — fallback usa global supabaseClient se exposto
+    window.AUTH.client = window.supabaseClient || null;
+  }
+
+  // ── Admin sub-tabs ─────────────────────────────────
+  window.switchAdmTab = function(name){
+    document.querySelectorAll('.adm-tab').forEach(function(b){
+      b.classList.toggle('adm-tab-active', b.getAttribute('data-admtab') === name);
+    });
+    document.getElementById('admSecPlants').style.display = name === 'plants' ? '' : 'none';
+    document.getElementById('admSecUsers').style.display  = name === 'users'  ? '' : 'none';
+    if (name === 'plants') loadPlants();
+    if (name === 'users')  { loadPlantsForSelect(); loadUsers(); }
+  };
+
+  window.renderAdminPage = function(){ switchAdmTab('plants'); };
+
+  // ── PLANTS ─────────────────────────────────────────
+  async function loadPlants(){
+    var c = sb(); if(!c) return;
+    var tbody = document.getElementById('admPlantsRows');
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;color:var(--t3);text-align:center">'+t('common.loading')+'</td></tr>';
+    var { data, error } = await c.from('plants').select('*').order('code');
+    if (error) { tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;color:#b00">'+error.message+'</td></tr>'; return; }
+    if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;color:var(--t3);text-align:center">—</td></tr>'; return; }
+    tbody.innerHTML = data.map(function(p){
+      return '<tr>'+
+        '<td><b>'+escapeHtml(p.code)+'</b></td>'+
+        '<td>'+escapeHtml(p.name)+'</td>'+
+        '<td>'+escapeHtml(p.country||'')+'</td>'+
+        '<td><code>'+escapeHtml(p.language_code)+'</code></td>'+
+        '<td style="text-align:right"><button class="btn btn-ghost btn-sm" onclick="adminDeletePlant(\''+p.id+'\',\''+escapeAttr(p.code)+'\')">🗑</button></td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  window.adminCreatePlant = async function(){
+    var c = sb(); if(!c) return;
+    var code = document.getElementById('newPlantCode').value.trim();
+    var name = document.getElementById('newPlantName').value.trim();
+    var ctry = document.getElementById('newPlantCountry').value.trim();
+    var lang = document.getElementById('newPlantLang').value;
+    if (!code || !name) { alert('Código e Nome são obrigatórios'); return; }
+    var { error } = await c.from('plants').insert({ code: code, name: name, country: ctry, language_code: lang });
+    if (error) { alert('Erro: '+error.message); return; }
+    document.getElementById('newPlantCode').value=''; document.getElementById('newPlantName').value=''; document.getElementById('newPlantCountry').value='';
+    loadPlants(); loadPlantSwitcher();
+  };
+  window.adminDeletePlant = async function(id, code){
+    if (!confirm('Excluir a planta "'+code+'"? Usuários vinculados perderão a vinculação.')) return;
+    var c = sb(); if(!c) return;
+    var { error } = await c.from('plants').delete().eq('id', id);
+    if (error) { alert('Erro: '+error.message); return; }
+    loadPlants(); loadPlantSwitcher();
+  };
+
+  // ── Seletor de planta no header (admin) ───────────
+  window.loadPlantSwitcher = async function(){
+    var c = sb(); if(!c) return;
+    var sel = document.getElementById('adminPlantSwitcher'); if(!sel) return;
+    var { data, error } = await c.from('plants').select('id,code,name').order('code');
+    if (error || !data) return;
+    var cur = (window.currentPlant && window.currentPlant.id) || '';
+    sel.innerHTML = '<option value="">— planta —</option>' + data.map(function(p){
+      return '<option value="'+p.id+'"'+(p.id===cur?' selected':'')+'>'+escapeHtml(p.code)+' · '+escapeHtml(p.name)+'</option>';
+    }).join('');
+  };
+  window.onAdminSwitchPlant = async function(plantId){
+    if (!plantId) return;
+    var c = sb(); if(!c) return;
+    var { data } = await c.from('plants').select('*').eq('id', plantId).maybeSingle();
+    if (data) {
+      window.currentPlant = data;
+      applyI18n(data.language_code || 'pt-BR');
+      if (typeof renderDashboard === 'function') renderDashboard();
+      if (typeof renderStudiesList === 'function') renderStudiesList();
+    }
+  };
+
+  // ── USERS ──────────────────────────────────────────
+  async function loadPlantsForSelect(){
+    var c = sb(); if(!c) return;
+    var sel = document.getElementById('newUserPlant'); if(!sel) return;
+    var { data } = await c.from('plants').select('id,code,name').order('code');
+    sel.innerHTML = (data||[]).map(function(p){ return '<option value="'+p.id+'">'+escapeHtml(p.code)+' · '+escapeHtml(p.name)+'</option>'; }).join('');
+  }
+
+  async function loadUsers(){
+    var c = sb(); if(!c) return;
+    var tbody = document.getElementById('admUsersRows');
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;color:var(--t3);text-align:center">'+t('common.loading')+'</td></tr>';
+    // profiles + plants + roles (3 queries — RLS admin policy libera tudo)
+    var [pRes, rRes, plRes] = await Promise.all([
+      c.from('profiles').select('id, full_name, plant_id'),
+      c.from('user_roles').select('user_id, role'),
+      c.from('plants').select('id, code')
+    ]);
+    if (pRes.error) { tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;color:#b00">'+pRes.error.message+'</td></tr>'; return; }
+    var profiles = pRes.data || [];
+    var roles    = rRes.data || [];
+    var plants   = plRes.data || [];
+    var plantMap = {}; plants.forEach(function(p){ plantMap[p.id] = p.code; });
+    var roleMap  = {}; roles.forEach(function(r){ (roleMap[r.user_id] = roleMap[r.user_id] || []).push(r.role); });
+    if (!profiles.length) { tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;color:var(--t3);text-align:center">—</td></tr>'; return; }
+    tbody.innerHTML = profiles.map(function(p){
+      var rs = (roleMap[p.id]||['user']).join(', ');
+      var isAdmin = (roleMap[p.id]||[]).indexOf('admin')>=0;
+      return '<tr>'+
+        '<td>'+escapeHtml(p.full_name||'(sem nome)')+'</td>'+
+        '<td><code style="font-size:11px">'+escapeHtml(p.id.substring(0,8))+'…</code></td>'+
+        '<td>'+
+          '<select onchange="adminSetUserPlant(\''+p.id+'\', this.value)" style="font-size:11.5px">'+
+            '<option value="">—</option>'+
+            plants.map(function(pl){ return '<option value="'+pl.id+'"'+(pl.id===p.plant_id?' selected':'')+'>'+escapeHtml(pl.code)+'</option>'; }).join('')+
+          '</select>'+
+        '</td>'+
+        '<td>'+
+          '<label style="font-size:12px;cursor:pointer"><input type="checkbox" '+(isAdmin?'checked':'')+' onchange="adminToggleRole(\''+p.id+'\', this.checked)"> admin</label>'+
+          ' <span style="font-size:10.5px;color:var(--t3)">('+escapeHtml(rs)+')</span>'+
+        '</td>'+
+        '<td style="text-align:right"><span style="font-size:11px;color:var(--t3)">—</span></td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  window.adminSetUserPlant = async function(userId, plantId){
+    var c = sb(); if(!c) return;
+    var { error } = await c.from('profiles').update({ plant_id: plantId || null }).eq('id', userId);
+    if (error) alert('Erro: '+error.message);
+  };
+  window.adminToggleRole = async function(userId, makeAdmin){
+    var c = sb(); if(!c) return;
+    if (makeAdmin) {
+      var { error } = await c.from('user_roles').insert({ user_id: userId, role: 'admin' });
+      if (error && !/duplicate/i.test(error.message)) alert('Erro: '+error.message);
+    } else {
+      var { error } = await c.from('user_roles').delete().eq('user_id', userId).eq('role','admin');
+      if (error) alert('Erro: '+error.message);
+    }
+  };
+
+  window.adminCreateUser = async function(){
+    var c = sb(); if(!c) return;
+    var msg = document.getElementById('admUserMsg');
+    var email = document.getElementById('newUserEmail').value.trim();
+    var name  = document.getElementById('newUserName').value.trim();
+    var pwd   = document.getElementById('newUserPwd').value;
+    var plant = document.getElementById('newUserPlant').value;
+    var role  = document.getElementById('newUserRole').value;
+    if (!email || !pwd || !plant) { msg.textContent = '⚠ Preencha e-mail, senha e planta.'; msg.style.color='#b00'; return; }
+    if (pwd.length < 8) { msg.textContent = '⚠ Senha precisa ter ao menos 8 caracteres.'; msg.style.color='#b00'; return; }
+    msg.textContent = 'Criando…'; msg.style.color='var(--t2)';
+    try {
+      var { data, error } = await c.functions.invoke('admin-create-user', {
+        body: { email: email, password: pwd, full_name: name, plant_id: plant, role: role }
+      });
+      if (error) { msg.textContent = '❌ '+(error.message||'falha'); msg.style.color='#b00'; return; }
+      if (data && data.error) { msg.textContent = '❌ '+data.error; msg.style.color='#b00'; return; }
+      msg.textContent = '✓ Usuário criado: '+email; msg.style.color='#0a7';
+      document.getElementById('newUserEmail').value=''; document.getElementById('newUserName').value=''; document.getElementById('newUserPwd').value='';
+      loadUsers();
+    } catch (e) {
+      msg.textContent = '❌ '+e.message; msg.style.color='#b00';
+    }
+  };
+
+  // ── Utils ─────────────────────────────────────────
+  function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
+  function escapeAttr(s){ return escapeHtml(s).replace(/'/g,"&#39;"); }
+
+  // Aplicar i18n no boot (caso o usuário já chegue logado, o onAuthStateChange chamará de novo com a planta certa)
+  if (document.readyState !== 'loading') applyI18n('pt-BR');
+  else document.addEventListener('DOMContentLoaded', function(){ applyI18n('pt-BR'); });
+})();
+</script>
+
 </body>
 </html>
