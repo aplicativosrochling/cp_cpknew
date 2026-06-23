@@ -90,7 +90,7 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.skypack.dev/@supabase/supabase-js@2"></script>
 
 <script>
 'use strict';
@@ -106,34 +106,40 @@ function $(id) { return document.getElementById(id); }
 
 // Inicializar Supabase
 function initSupabase() {
-  if (!window.supabase) {
-    setTimeout(initSupabase, 100);
+  if (!window.supabase || !window.supabase.createClient) {
+    console.log('[DB] Aguardando biblioteca Supabase...');
+    setTimeout(initSupabase, 500);
     return;
   }
   
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  console.log('[DB] Supabase inicializado');
-  
-  // Monitorar autenticação AQUI DENTRO
-  supabase.auth.onAuthStateChange(function(event, session) {
-    var gate = $('authGate');
-    var app = document.querySelector('.app');
-    var badge = $('userBadge');
+  try {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log('[DB] Supabase inicializado com sucesso');
+    
+    // Monitorar autenticação AQUI DENTRO
+    supabase.auth.onAuthStateChange(function(event, session) {
+      var gate = $('authGate');
+      var app = document.querySelector('.app');
+      var badge = $('userBadge');
 
-    if (session && session.user) {
-      console.log('[AUTH] Logado:', session.user.email);
-      gate.style.display = 'none';
-      app.style.display = 'flex';
-      badge.textContent = session.user.email;
-      badge.style.display = '';
-      setTimeout(window._dbInit, 100);
-    } else {
-      console.log('[AUTH] Deslogado');
-      gate.style.display = 'flex';
-      app.style.display = 'none';
-      badge.style.display = 'none';
-    }
-  });
+      if (session && session.user) {
+        console.log('[AUTH] Logado:', session.user.email);
+        gate.style.display = 'none';
+        app.style.display = 'flex';
+        badge.textContent = session.user.email;
+        badge.style.display = '';
+        setTimeout(window._dbInit, 100);
+      } else {
+        console.log('[AUTH] Deslogado');
+        gate.style.display = 'flex';
+        app.style.display = 'none';
+        badge.style.display = 'none';
+      }
+    });
+  } catch (err) {
+    console.error('[DB] Erro ao inicializar Supabase:', err.message);
+    setTimeout(initSupabase, 1000);
+  }
 }
 
 initSupabase();
@@ -198,6 +204,14 @@ window.AUTH = {
 // UI
 window.handleLogin = async function(e) {
   e.preventDefault();
+  
+  // SAFETY CHECK: Aguardar Supabase estar pronto
+  if (!supabase) {
+    $('loginError').textContent = 'Aguarde... Sistema inicializando...';
+    setTimeout(() => window.handleLogin(e), 500);
+    return;
+  }
+  
   try {
     await window.AUTH.login($('loginEmail').value, $('loginPassword').value);
     $('loginError').textContent = '';
