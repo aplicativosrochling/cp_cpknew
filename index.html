@@ -90,7 +90,7 @@
   </div>
 </div>
 
-<script src="https://cdn.skypack.dev/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2.39.0"></script>
 
 <script>
 'use strict';
@@ -104,45 +104,41 @@ var allStudies = [];
 
 function $(id) { return document.getElementById(id); }
 
-// Inicializar Supabase
-function initSupabase() {
-  if (!window.supabase || !window.supabase.createClient) {
-    console.log('[DB] Aguardando biblioteca Supabase...');
-    setTimeout(initSupabase, 500);
-    return;
-  }
-  
-  try {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log('[DB] Supabase inicializado com sucesso');
-    
-    // Monitorar autenticação AQUI DENTRO
-    supabase.auth.onAuthStateChange(function(event, session) {
-      var gate = $('authGate');
-      var app = document.querySelector('.app');
-      var badge = $('userBadge');
+// Inicializar Supabase com delay para garantir carregamento da biblioteca
+setTimeout(function() {
+  if (window.supabase && window.supabase.createClient) {
+    try {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      console.log('[DB] ✅ Supabase inicializado');
+      
+      // Monitorar estado de autenticação
+      supabase.auth.onAuthStateChange(function(event, session) {
+        console.log('[AUTH] Evento:', event, 'Session:', !!session);
+        var gate = $('authGate');
+        var app = document.querySelector('.app');
+        var badge = $('userBadge');
 
-      if (session && session.user) {
-        console.log('[AUTH] Logado:', session.user.email);
-        gate.style.display = 'none';
-        app.style.display = 'flex';
-        badge.textContent = session.user.email;
-        badge.style.display = '';
-        setTimeout(window._dbInit, 100);
-      } else {
-        console.log('[AUTH] Deslogado');
-        gate.style.display = 'flex';
-        app.style.display = 'none';
-        badge.style.display = 'none';
-      }
-    });
-  } catch (err) {
-    console.error('[DB] Erro ao inicializar Supabase:', err.message);
-    setTimeout(initSupabase, 1000);
+        if (session && session.user) {
+          console.log('[AUTH] ✅ Logado:', session.user.email);
+          gate.style.display = 'none';
+          app.style.display = 'flex';
+          badge.textContent = session.user.email;
+          badge.style.display = '';
+          setTimeout(window._dbInit, 100);
+        } else {
+          console.log('[AUTH] 🚪 Deslogado');
+          gate.style.display = 'flex';
+          app.style.display = 'none';
+          badge.style.display = 'none';
+        }
+      });
+    } catch (err) {
+      console.error('[DB] ❌ Erro:', err.message);
+    }
+  } else {
+    console.warn('[DB] ⏳ Biblioteca Supabase não carregada ainda');
   }
-}
-
-initSupabase();
+}, 1500);
 
 // APIs
 window.DB = {
@@ -205,19 +201,19 @@ window.AUTH = {
 window.handleLogin = async function(e) {
   e.preventDefault();
   
-  // SAFETY CHECK: Aguardar Supabase estar pronto
   if (!supabase) {
-    $('loginError').textContent = 'Aguarde... Sistema inicializando...';
-    setTimeout(() => window.handleLogin(e), 500);
+    $('loginError').textContent = '⏳ Sistema ainda inicializando... tente novamente';
     return;
   }
   
   try {
+    $('loginError').textContent = '⏳ Autenticando...';
     await window.AUTH.login($('loginEmail').value, $('loginPassword').value);
     $('loginError').textContent = '';
     $('loginForm').reset();
   } catch (err) {
-    $('loginError').textContent = 'Erro: ' + err.message;
+    console.error('[LOGIN] Erro:', err);
+    $('loginError').textContent = '❌ Erro: ' + (err.message || 'Falha na autenticação');
   }
 };
 
@@ -339,16 +335,26 @@ function renderStudyView() {
 
 async function loadStudies() {
   try {
+    console.log('[DB] Buscando estudos...');
     allStudies = await window.DB.getAll();
+    console.log('[DB] ✅ ' + allStudies.length + ' estudo(s) encontrado(s)');
     updateStudiesList();
     renderStudyView();
   } catch (err) {
-    console.error('[APP] Erro:', err);
+    console.error('[DB] ❌ Erro ao carregar estudos:', err.message);
+    if (err.message.includes('public.users')) {
+      console.warn('[DB] ⚠️ Tabela users não existe - criar em Supabase');
+    }
   }
 }
 
 window._dbInit = async function() {
-  console.log('[APP] Inicializando...');
+  if (!supabase) {
+    console.error('[APP] Supabase não inicializado');
+    return;
+  }
+  
+  console.log('[APP] Carregando estudos...');
   try {
     await loadStudies();
     window.DB.listen(studies => {
@@ -356,9 +362,10 @@ window._dbInit = async function() {
       updateStudiesList();
       renderStudyView();
     });
-    console.log('[APP] Pronto!');
+    console.log('[APP] ✅ Sistema pronto!');
   } catch (err) {
-    console.error('[APP] Erro:', err);
+    console.error('[APP] ❌ Erro ao carregar estudos:', err);
+    $('viewContent').innerHTML = '<p style="color:var(--fail);">Erro ao carregar dados: ' + err.message + '</p>';
   }
 };
 </script>
