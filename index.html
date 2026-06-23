@@ -48,6 +48,7 @@ function initSupabaseClient() {
     });
 
     window._supabase = supabaseClient;
+    window._supabaseClient = supabaseClient; // ← Expor globalmente para window.AUTH usar
 
     // ── Estado local ──
     var currentSession = null;
@@ -238,8 +239,13 @@ function initSupabaseClient() {
     // ── AUTH globais (assinaturas idênticas) ──
     window.AUTH = {
       login: async function(email, pass) {
+        console.log('[SB] 🔐 Tentando login com:', email);
         var { data, error } = await supabaseClient.auth.signInWithPassword({ email: email, password: pass });
-        if (error) throw error;
+        if (error) {
+          console.error('[SB] ❌ Erro login:', error.message);
+          throw error;
+        }
+        console.log('[SB] ✓ Login bem-sucedido!');
         return { user: data.user };
       },
       reset: async function(email) {
@@ -254,10 +260,12 @@ function initSupabaseClient() {
         return currentSession ? currentSession.user : null;
       }
     };
+    
+    console.log('[SB] ✓ window.AUTH exposto e pronto para usar.');
 
     // ── Listener de estado de auth ──
     supabaseClient.auth.onAuthStateChange(async function(event, session) {
-      console.log('[SB] Auth state:', event);
+      console.log('[SB] 🔄 Auth event:', event, '| Session:', session ? '✓ Sim' : '✗ Não');
       var gate = document.getElementById('authGate');
       var appEl = document.querySelector('.app');
       var userBadge = document.getElementById('userBadge');
@@ -265,29 +273,39 @@ function initSupabaseClient() {
       currentSession = session;
 
       if (session && session.user) {
+        console.log('[SB] 📥 Carregando perfil para:', session.user.email);
         currentProfile = await fetchUserProfile(session.user.id);
         currentPlant   = currentProfile ? currentProfile.plants : null;
 
-        console.log('[SB] Auth:', session.user.email,
+        console.log('[SB] ✓ Auth:', session.user.email,
           '| Role:', currentProfile ? currentProfile.role : '?',
           '| Plant:', currentPlant ? currentPlant.code : '?');
 
-        if (gate) gate.style.display = 'none';
-        if (appEl) appEl.style.display = '';
+        console.log('[SB] 🎨 Escondendo login, mostrando dashboard...');
+        if (gate) { gate.style.display = 'none'; console.log('[SB]   ✓ Gate ocultado'); }
+        if (appEl) { appEl.style.display = ''; console.log('[SB]   ✓ App visível'); }
         if (userBadge) {
           var txt = session.user.email;
           if (currentPlant) txt += ' · ' + currentPlant.code;
           if (currentProfile && currentProfile.role === 'admin') txt += ' [ADMIN]';
           userBadge.textContent = txt;
           userBadge.style.display = '';
+          console.log('[SB]   ✓ User badge atualizado');
         }
+        console.log('[SB] 🔧 Expondo FB...');
         exposeFB();
-        if (typeof window._fbInit === 'function') window._fbInit();
+        console.log('[SB] ✓ FB exposto!');
+        
+        if (typeof window._fbInit === 'function') { 
+          console.log('[SB] 🚀 Chamando _fbInit()...');
+          window._fbInit();
+          console.log('[SB] ✓ _fbInit() executado!');
+        }
 
         var syncEl = document.getElementById('dashSyncState');
         if (syncEl) syncEl.textContent = 'online · ' + (currentPlant ? currentPlant.code : '?');
       } else {
-        console.log('[SB] Sem usuário.');
+        console.log('[SB] ⚠️ Sem usuário. Mostrando login.');
         currentProfile = null; currentPlant = null;
         if (gate) gate.style.display = 'flex';
         if (appEl) appEl.style.display = 'none';
@@ -299,12 +317,17 @@ function initSupabaseClient() {
 
     // ── Inicialização: sessão existente ──
     (async function init() {
+      console.log('[SB] 🔍 Verificando sessão existente...');
       var { data: { session } } = await supabaseClient.auth.getSession();
       if (session) {
+        console.log('[SB] ✓ Sessão encontrada para:', session.user.email);
         currentSession = session;
         currentProfile = await fetchUserProfile(session.user.id);
         currentPlant   = currentProfile ? currentProfile.plants : null;
+      } else {
+        console.log('[SB] ℹ️ Sem sessão anterior.');
       }
+      console.log('[SB] ✅ Inicialização completa! Pronto para login.');
       setTimeout(testConnection, 1000);
     })();
 
