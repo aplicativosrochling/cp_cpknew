@@ -60,14 +60,29 @@ function initSupabaseClient() {
     // ── Helper: buscar perfil do usuário ──
     async function fetchUserProfile(userId) {
       try {
+        console.log('[SB] 🔎 Iniciando busca de perfil para userId:', userId);
+        
         var { data, error } = await supabaseClient
           .from('profiles')
           .select('*, plants:plant_id(*)')
           .eq('id', userId)
           .single();
-        if (error) { console.warn('[SB] Erro perfil:', error.message); return null; }
+        
+        if (error) { 
+          console.error('[SB] ❌ ERRO ao buscar perfil:', error.message);
+          console.error('[SB] Detalhes do erro:', error);
+          console.error('[SB] Code:', error.code);
+          return null; 
+        }
+        
+        console.log('[SB] ✓ Perfil carregado com sucesso!');
+        console.log('[SB] Dados:', data);
         return data;
-      } catch (e) { console.error('[SB] Exceção perfil:', e); return null; }
+      } catch (e) { 
+        console.error('[SB] ❌ EXCEÇÃO ao buscar perfil:', e.message);
+        console.error('[SB] Stack:', e.stack);
+        return null; 
+      }
     }
 
     // ── Helper: converter row Supabase → objeto estudo (compatível com Firestore) ──
@@ -281,6 +296,15 @@ function initSupabaseClient() {
       if (session && session.user) {
         console.log('[SB] 📥 Carregando perfil para:', session.user.email);
         currentProfile = await fetchUserProfile(session.user.id);
+        
+        if (!currentProfile) {
+          console.error('[SB] ❌ PROBLEMA: Perfil não foi carregado!');
+          console.log('[SB] ℹ️ Verifique se a tabela "profiles" tem dados para este usuário.');
+          console.log('[SB] SQL para verificar:');
+          console.log('SELECT * FROM profiles WHERE id = ' + "'" + session.user.id + "'" + ';');
+          return;
+        }
+        
         currentPlant   = currentProfile ? currentProfile.plants : null;
 
         console.log('[SB] ✓ Auth:', session.user.email,
@@ -336,12 +360,25 @@ function initSupabaseClient() {
     // ── Inicialização: sessão existente ──
     (async function init() {
       console.log('[SB] 🔍 Verificando sessão existente...');
-      var { data: { session } } = await supabaseClient.auth.getSession();
+      var { data: { session }, error } = await supabaseClient.auth.getSession();
+      
+      if (error) {
+        console.error('[SB] ❌ Erro ao obter sessão:', error.message);
+        return;
+      }
+      
       if (session) {
         console.log('[SB] ✓ Sessão encontrada para:', session.user.email);
         currentSession = session;
+        console.log('[SB] 📥 Carregando perfil da sessão existente...');
         currentProfile = await fetchUserProfile(session.user.id);
         currentPlant   = currentProfile ? currentProfile.plants : null;
+        
+        if (currentProfile) {
+          console.log('[SB] ✓ Perfil da sessão carregado!');
+        } else {
+          console.warn('[SB] ⚠️ Sessão existe mas perfil não foi carregado.');
+        }
       } else {
         console.log('[SB] ℹ️ Sem sessão anterior.');
       }
