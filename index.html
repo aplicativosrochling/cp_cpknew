@@ -243,9 +243,10 @@ function initSupabaseClient() {
         var { data, error } = await supabaseClient.auth.signInWithPassword({ email: email, password: pass });
         if (error) {
           console.error('[SB] ❌ Erro login:', error.message);
+          console.error('[SB] Detalhes:', error);
           throw error;
         }
-        console.log('[SB] ✓ Login bem-sucedido!');
+        console.log('[SB] ✓ Login bem-sucedido! Aguardando atualização da interface...');
         return { user: data.user };
       },
       reset: async function(email) {
@@ -270,6 +271,11 @@ function initSupabaseClient() {
       var appEl = document.querySelector('.app');
       var userBadge = document.getElementById('userBadge');
 
+      console.log('[SB] 🔍 Verificando elementos DOM:');
+      console.log('[SB]   - authGate:', !!gate, gate ? '(encontrado)' : '(❌ NÃO ENCONTRADO)');
+      console.log('[SB]   - .app:', !!appEl, appEl ? '(encontrado)' : '(❌ NÃO ENCONTRADO)');
+      console.log('[SB]   - userBadge:', !!userBadge, userBadge ? '(encontrado)' : '(❌ NÃO ENCONTRADO)');
+
       currentSession = session;
 
       if (session && session.user) {
@@ -282,25 +288,37 @@ function initSupabaseClient() {
           '| Plant:', currentPlant ? currentPlant.code : '?');
 
         console.log('[SB] 🎨 Escondendo login, mostrando dashboard...');
-        if (gate) { gate.style.display = 'none'; console.log('[SB]   ✓ Gate ocultado'); }
-        if (appEl) { appEl.style.display = ''; console.log('[SB]   ✓ App visível'); }
+        if (gate) { 
+          gate.style.display = 'none'; 
+          gate.classList.add('hidden');
+          console.log('[SB]   ✓ Gate ocultado'); 
+        }
+        if (appEl) { 
+          appEl.style.display = 'flex'; // Usar flex em vez de ''
+          appEl.classList.remove('hidden');
+          console.log('[SB]   ✓ App visível'); 
+        }
         if (userBadge) {
           var txt = session.user.email;
           if (currentPlant) txt += ' · ' + currentPlant.code;
           if (currentProfile && currentProfile.role === 'admin') txt += ' [ADMIN]';
           userBadge.textContent = txt;
-          userBadge.style.display = '';
+          userBadge.style.display = 'block';
           console.log('[SB]   ✓ User badge atualizado');
         }
-        console.log('[SB] 🔧 Expondo FB...');
-        exposeFB();
-        console.log('[SB] ✓ FB exposto!');
         
-        if (typeof window._fbInit === 'function') { 
-          console.log('[SB] 🚀 Chamando _fbInit()...');
-          window._fbInit();
-          console.log('[SB] ✓ _fbInit() executado!');
-        }
+        // Aguardar um pouco antes de expor FB para garantir que DOM está pronto
+        setTimeout(function() {
+          console.log('[SB] 🔧 Expondo FB...');
+          exposeFB();
+          console.log('[SB] ✓ FB exposto!');
+          
+          if (typeof window._fbInit === 'function') { 
+            console.log('[SB] 🚀 Chamando _fbInit()...');
+            window._fbInit();
+            console.log('[SB] ✓ _fbInit() executado!');
+          }
+        }, 200);
 
         var syncEl = document.getElementById('dashSyncState');
         if (syncEl) syncEl.textContent = 'online · ' + (currentPlant ? currentPlant.code : '?');
