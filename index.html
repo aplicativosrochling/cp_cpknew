@@ -3,1035 +3,350 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Estudo de Capabilidade - SaaS Multi-Tenant Global (Supabase)</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<title>Estudo de Capabilidade</title>
 <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
-<!-- Supabase Client -->
-<script src="https://unpkg.com/@supabase/supabase-js@2.45.0/dist/umd/supabase.js"></script>
-
 <style>
-/* ══════════════════════════════════════════════════════
-   DESIGN TOKENS — LIGHT CORPORATE THEME (SaaS Edition)
-══════════════════════════════════════════════════════ */
-:root{
-  --s0:#ffffff; --s1:#f7f8fc; --s2:#eef0f7; --s3:#e3e6f0; --s4:#d0d5e8;
-  --t0:#0f1623; --t1:#2d3655; --t2:#5a6280; --t3:#9099b8;
-  --blue:#1a56db; --blue-l:#dbeafe; --blue-m:#93c5fd;
-  --ok:#059669;    --ok-l:#d1fae5;    --ok-b:#34d399;
-  --warn:#d97706;  --warn-l:#fef3c7;  --warn-b:#fbbf24;
-  --fail:#dc2626;  --fail-l:#fee2e2;  --fail-b:#f87171;
-  --info:#2563eb;  --info-l:#dbeafe;  --info-b:#93c5fd;
-}
-
-* { box-sizing: border-box; }
-html, body { 
-  margin: 0; 
-  padding: 0; 
-  font-family: 'Plus Jakarta Sans', sans-serif; 
-  color: var(--t0); 
-  background: var(--s1); 
-  min-height: 100vh;
-}
-
-/* ─── TOPBAR ─── */
-.topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 24px;
-  background: var(--s0);
-  border-bottom: 1px solid var(--s3);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  position: fixed;
-  width: 100%;
-  top: 0;
-  z-index: 500;
-  height: 60px;
-}
-.topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-}
-.topbar-title { font-size: 18px; font-weight: 700; color: var(--t0); }
-.topbar-plant-badge {
-  background: var(--blue-l);
-  color: var(--blue);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.topbar-btn {
-  background: none;
-  border: none;
-  color: var(--t1);
-  cursor: pointer;
-  font-size: 14px;
-  padding: 8px 12px;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-.topbar-btn:hover { background: var(--s2); color: var(--t0); }
-.user-dropdown {
-  display: none;
-  position: absolute;
-  top: 100%;
-  right: 0;
-  background: var(--s0);
-  border: 1px solid var(--s3);
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  min-width: 200px;
-  z-index: 1000;
-}
-.user-dropdown.open { display: block; }
-.user-dropdown-item {
-  display: block;
-  padding: 12px 16px;
-  border: none;
-  background: none;
-  text-align: left;
-  width: 100%;
-  cursor: pointer;
-  color: var(--t1);
-  font-size: 14px;
-  transition: background 0.2s;
-}
-.user-dropdown-item:hover { background: var(--s2); }
-
-/* ─── MAIN LAYOUT ─── */
-.app {
-  display: none;
-  padding-top: 60px;
-}
-.app.open { display: block; }
-
-.main-container {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-/* ─── AUTH GATE ─── */
-#authGate {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-.auth-card {
-  background: var(--s0);
-  padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-  width: 100%;
-  max-width: 380px;
-}
-.auth-card-title {
-  font-size: 24px;
-  font-weight: 700;
-  margin-bottom: 8px;
-  color: var(--t0);
-}
-.auth-card-subtitle {
-  font-size: 14px;
-  color: var(--t2);
-  margin-bottom: 24px;
-}
-.form-group {
-  margin-bottom: 16px;
-}
-.form-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--t1);
-  margin-bottom: 6px;
-}
-.form-input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--s3);
-  border-radius: 4px;
-  font-size: 14px;
-  color: var(--t0);
-  background: var(--s1);
-  transition: border-color 0.2s;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-}
-.form-input:focus {
-  outline: none;
-  border-color: var(--blue);
-  background: var(--s0);
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-}
-.btn-primary {
-  background: var(--blue);
-  color: var(--s0);
-  width: 100%;
-}
-.btn-primary:hover { background: #0d47a1; }
-.btn-secondary {
-  background: var(--s2);
-  color: var(--t1);
-}
-.btn-secondary:hover { background: var(--s3); }
-.btn-danger {
-  background: var(--fail);
-  color: var(--s0);
-}
-.btn-danger:hover { background: #991b1b; }
-
-.btn-sm { padding: 6px 12px; font-size: 13px; }
-
-/* ─── CARDS ─── */
-.card {
-  background: var(--s0);
-  border: 1px solid var(--s3);
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-.card-title {
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 16px;
-  color: var(--t0);
-}
-
-/* ─── TABLES ─── */
-.table-container {
-  overflow-x: auto;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-thead th {
-  background: var(--s2);
-  padding: 12px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--t1);
-  border-bottom: 1px solid var(--s3);
-}
-tbody td {
-  padding: 12px;
-  border-bottom: 1px solid var(--s3);
-  font-size: 14px;
-  color: var(--t1);
-}
-tbody tr:hover { background: var(--s1); }
-
-.badge {
-  display: inline-block;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-}
-.badge-success { background: var(--ok-l); color: var(--ok); }
-.badge-danger { background: var(--fail-l); color: var(--fail); }
-
-/* ─── TOAST ─── */
-.toast {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  padding: 16px 24px;
-  border-radius: 8px;
-  color: var(--s0);
-  font-weight: 600;
-  z-index: 9999;
-  animation: slideIn 0.3s ease;
-}
-.toast.success { background: var(--ok); }
-.toast.error { background: var(--fail); }
-.toast.info { background: var(--info); }
-@keyframes slideIn {
-  from { transform: translateX(400px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-
-.empty-state {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--t2);
-}
-.empty-state-icon { font-size: 48px; margin-bottom: 16px; }
-.empty-state-title { font-size: 16px; font-weight: 600; }
-
-/* ─── LOADING SPINNER ─── */
-.spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--s3);
-  border-top-color: var(--blue);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* ─── DEBUG PANEL ─── */
-.debug-panel {
-  background: var(--s0);
-  border: 1px solid var(--s3);
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
-  font-family: 'Geist Mono', monospace;
-  font-size: 12px;
-}
-.debug-panel h4 { margin: 0 0 8px 0; color: var(--t1); }
-.debug-panel pre {
-  background: var(--s1);
-  padding: 12px;
-  border-radius: 4px;
-  overflow-x: auto;
-  max-height: 200px;
-  margin: 0;
-}
-
-/* ─── RLS ERROR PANEL ─── */
-.rls-error-box {
-  background: var(--fail-l);
-  border: 1px solid var(--fail-b);
-  border-radius: 8px;
-  padding: 20px;
-  margin: 16px 0;
-  color: var(--t0);
-}
-.rls-error-box h3 {
-  margin: 0 0 12px 0;
-  color: var(--fail);
-  font-size: 16px;
-}
-.rls-error-box pre {
-  background: var(--s0);
-  padding: 12px;
-  border-radius: 4px;
-  overflow-x: auto;
-  font-size: 12px;
-  border: 1px solid var(--s3);
-}
-.rls-error-box code {
-  background: var(--s2);
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-family: 'Geist Mono', monospace;
-  font-size: 12px;
-}
+:root{--s0:#ffffff;--s1:#f7f8fc;--s2:#eef0f7;--s3:#e3e6f0;--t0:#0f1623;--t1:#2d3655;--t2:#5a6280;--t3:#9099b8;--blue:#1a56db;--blue-l:#dbeafe;--fail:#dc2626;--fail-l:#fee2e2;--family:'Plus Jakarta Sans',sans-serif;--mono:'Geist Mono',monospace}*,*::before,*::after{box-sizing:border-box}html,body{height:100%;margin:0;padding:0}body{font-family:var(--family);font-size:14px;background-color:var(--s1);color:var(--t0);line-height:1.5}h1,h2,h3,h4,h5,h6,p,ul,ol,li{margin:0;padding:0}ul,ol{list-style:none}button,input,select,textarea{font:inherit;color:inherit}#authGate{display:flex;align-items:center;justify-content:center;width:100%;height:100vh;background:linear-gradient(135deg,var(--blue-l) 0%,var(--s2) 100%);flex-direction:column;gap:16px}#loginForm{background:var(--s0);border-radius:8px;padding:32px;box-shadow:0 4px 16px rgba(0,0,0,0.08);width:100%;max-width:360px}#loginForm h2{font-size:18px;font-weight:700;margin-bottom:24px}#loginForm input{width:100%;padding:8px 12px;margin-bottom:12px;border:1px solid var(--s3);border-radius:4px}#loginForm button{width:100%;padding:10px;background:var(--blue);color:var(--s0);border:none;border-radius:4px;font-weight:600;cursor:pointer}#loginForm button:hover{background:#0f46c0}.app{display:none;width:100vw;height:100vh;flex-direction:column}.topbar{background:var(--s0);border-bottom:1px solid var(--s2);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}#topbarLogoImg{height:36px;width:auto}.app-container{display:flex;flex:1;overflow:hidden}.sidebar{width:280px;background:var(--s1);border-right:1px solid var(--s2);overflow-y:auto;padding:16px;flex-shrink:0}.content{flex:1;display:flex;flex-direction:column;overflow:hidden}.main-view{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--s0)}.view-header{padding:20px;border-bottom:1px solid var(--s2);flex-shrink:0}.view-content{flex:1;overflow-y:auto;padding:20px}.studies-list{margin-top:16px}.study-item{padding:12px;background:var(--s0);border:1px solid var(--s3);border-radius:4px;margin-bottom:8px;cursor:pointer}.study-item.active{border-color:var(--blue);background:var(--blue-l)}.study-item-name{font-weight:600;font-size:13px}.form-group{margin-bottom:16px}.form-group label{display:block;font-weight:600;font-size:13px;margin-bottom:6px}.form-group input,.form-group textarea{width:100%;padding:8px 10px;border:1px solid var(--s3);border-radius:4px;font-size:13px}.form-group textarea{resize:vertical;min-height:80px}.btn{padding:8px 16px;border:1px solid var(--s3);border-radius:4px;background:var(--s0);color:var(--t0);cursor:pointer;font-weight:600;font-size:13px}.btn.primary{background:var(--blue);color:var(--s0)}.btn.danger{color:var(--fail)}.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:1000}.modal.open{display:flex}.modal-content{background:var(--s0);border-radius:8px;padding:32px;max-width:600px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.15);max-height:80vh;overflow-y:auto}.modal-footer{margin-top:24px;display:flex;gap:12px;justify-content:flex-end}.data-table{width:100%;border-collapse:collapse;font-size:13px}.data-table th{background:var(--s2);padding:10px;text-align:left;font-weight:600;border-bottom:2px solid var(--s3)}.data-table td{padding:10px;border-bottom:1px solid var(--s3)}
 </style>
-
-<base target="_blank">
 </head>
 <body>
 
-<!-- AUTH GATE -->
 <div id="authGate">
-  <div class="auth-card">
-    <div class="auth-card-title">🔐 SaaS CP/CPK</div>
-    <div class="auth-card-subtitle">Estudo de Capabilidade com Supabase</div>
-    <div id="authError" style="display: none; background: var(--fail-l); color: var(--fail); padding: 12px; border-radius: 4px; margin-bottom: 16px; font-size: 13px;"></div>
-    <form id="loginForm">
-      <div class="form-group">
-        <label class="form-label">Email</label>
-        <input type="email" id="loginEmail" class="form-input" placeholder="seu@email.com" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Senha</label>
-        <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" required>
-      </div>
-      <button type="submit" class="btn btn-primary" id="loginBtn">
-        <span id="loginBtnText">Entrar</span>
-        <span id="loginBtnSpinner" class="spinner" style="display:none;"></span>
-      </button>
-    </form>
-  </div>
+  <form id="loginForm" onsubmit="handleLogin(event)">
+    <h2>🔐 Acesso ao Sistema</h2>
+    <input type="email" id="loginEmail" placeholder="Email" required />
+    <input type="password" id="loginPassword" placeholder="Senha" required />
+    <button type="submit">Entrar</button>
+    <div id="loginError" style="color:var(--fail);font-size:12px;margin-top:8px;"></div>
+  </form>
 </div>
 
-<!-- APP -->
-<div id="app" class="app">
+<div class="app" style="display:flex;">
   <div class="topbar">
-    <div class="topbar-left">
-      <div class="topbar-title">📊 CP/CPK Supabase</div>
-      <span class="topbar-plant-badge" id="topbarPlantBadge" style="display: none;"></span>
+    <div style="display:flex;align-items:center;gap:16px;flex:1;">
+      <img id="topbarLogoImg" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect fill='%231a56db' width='48' height='48' rx='4'/%3E%3Ctext x='24' y='32' font-size='24' font-weight='bold' fill='white' text-anchor='middle'%3ECP%3C/text%3E%3C/svg%3E" alt="Logo" />
+      <div>
+        <h1 style="font-size:18px;margin:0;">Estudo de Capabilidade</h1>
+        <span style="font-size:11px;color:var(--t3);">AIAG / ISO 22514</span>
+      </div>
     </div>
-    <div class="topbar-right">
-      <button class="topbar-btn" id="btnNewStudy" style="display: none;">+ Novo Estudo</button>
-      <button class="topbar-btn" id="btnAdminPanel" style="display: none;">⚙️ Admin</button>
-      <button class="topbar-btn" id="btnLogout">Sair</button>
-    </div>
+    <span id="userBadge" style="font-size:12px;color:var(--t2);display:none;"></span>
+    <button type="button" class="btn" onclick="handleLogout()" style="margin-left:20px;font-size:12px;">🚪 Sair</button>
   </div>
 
-  <div class="main-container">
-    <div class="card">
-      <div class="card-title">📈 Estudos de Capabilidade</div>
-      <div id="studiesList" style="min-height: 200px;"></div>
+  <div class="app-container">
+    <div class="sidebar">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h2 style="font-size:14px;font-weight:700;margin:0;">📋 Estudos</h2>
+        <button type="button" class="btn" onclick="createNewStudy()" style="padding:4px 8px;">➕</button>
+      </div>
+      <div class="studies-list" id="studiesList"></div>
     </div>
 
-    <!-- RLS Error Panel -->
-    <div id="rlsErrorPanel" style="display: none;"></div>
-
-    <!-- Debug Panel (visível apenas em desenvolvimento) -->
-    <div class="debug-panel" id="debugPanel" style="display: none;">
-      <h4>🔧 Diagnóstico de Integração</h4>
-      <pre id="debugContent"></pre>
+    <div class="content">
+      <div class="main-view">
+        <div class="view-header">
+          <h1 id="studyTitle" style="margin:0;">Selecione um estudo</h1>
+        </div>
+        <div class="view-content" id="viewContent">
+          <p style="color:var(--t3);">Crie ou selecione um estudo na lista ao lado para começar.</p>
+        </div>
+      </div>
     </div>
   </div>
 </div>
+
+<div id="studyModal" class="modal">
+  <div class="modal-content">
+    <div style="font-size:18px;font-weight:700;margin-bottom:20px;">Editar Estudo</div>
+    <div class="form-group">
+      <label>Nome do Estudo</label>
+      <input type="text" id="studyName" />
+    </div>
+    <div class="form-group">
+      <label>Descrição</label>
+      <textarea id="studyDescription"></textarea>
+    </div>
+    <div class="form-group">
+      <label>LSL</label>
+      <input type="number" id="studyLSL" step="0.01" />
+    </div>
+    <div class="form-group">
+      <label>Nominal</label>
+      <input type="number" id="studyNominal" step="0.01" />
+    </div>
+    <div class="form-group">
+      <label>USL</label>
+      <input type="number" id="studyUSL" step="0.01" />
+    </div>
+    <div class="form-group">
+      <label>Medições (uma por linha)</label>
+      <textarea id="studyMeasurements"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" onclick="closeStudyModal()">Cancelar</button>
+      <button type="button" class="btn primary" onclick="saveStudyFromModal()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-// ═══════════════════════════════════════════════════════
-// HELPER FUNCTIONS
-// ═══════════════════════════════════════════════════════
+'use strict';
 
-const $ = (id) => document.getElementById(id)
-const show = (el) => { if(el) el.style.display = '' }
-const hide = (el) => { if(el) el.style.display = 'none' }
+var SUPABASE_URL = 'https://jlabjdq8nflvydcfya.supabase.co';
+var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpsYWJqZHE4bmZsdnlkY2Z5YSIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzA0MDY3ODAwLCJleHAiOjE4NjE3MzU4MDB9.z_u0C8xJx4rZJWzL-pCKA8SvPddHjd1bS2n_O9PrIbU';
 
-function showToast(message, type = 'info') {
-  const toast = document.createElement('div')
-  toast.className = `toast ${type}`
-  toast.textContent = message
-  document.body.appendChild(toast)
-  setTimeout(() => toast.remove(), 3000)
-}
+var supabase = null;
+var currentStudy = null;
+var allStudies = [];
 
-function setLoading(isLoading) {
-  const btn = $('loginBtn')
-  const text = $('loginBtnText')
-  const spinner = $('loginBtnSpinner')
-  if (!btn) return
-  btn.disabled = isLoading
-  if (text) text.style.display = isLoading ? 'none' : ''
-  if (spinner) spinner.style.display = isLoading ? '' : 'none'
-}
+function $(id) { return document.getElementById(id); }
 
-function logDebug(info) {
-  const panel = $('debugPanel')
-  const content = $('debugContent')
-  if (!panel || !content) return
-  show(panel)
-  const existing = content.textContent
-  const timestamp = new Date().toLocaleTimeString()
-  content.textContent = existing + `[${timestamp}] ${info}\n`
-  content.scrollTop = content.scrollHeight
-}
-
-function showRLSError(error) {
-  const panel = $('rlsErrorPanel')
-  if (!panel) return
-
-  let title = 'Erro de Configuração'
-  let message = error.message || 'Erro desconhecido'
-  let sql = ''
-
-  if (error.code === '42P17') {
-    title = '⚠️ Recursão Infinita na Política RLS'
-    message = 'A política RLS da tabela <code>users</code> está causando recursão infinita. A política não pode consultar a própria tabela <code>users</code> dentro de si mesma.'
-    sql = `-- Execute no SQL Editor do Supabase para corrigir:
-
--- 1. Remover políticas antigas (se existirem)
-DROP POLICY IF EXISTS "Users read own data" ON public.users;
-DROP POLICY IF EXISTS "Studies by plant" ON public.studies;
-DROP POLICY IF EXISTS "Plants readable" ON public.plants;
-
--- 2. Habilitar RLS
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.studies ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.plants ENABLE ROW LEVEL SECURITY;
-
--- 3. Política CORRETA para users (sem subquery na própria tabela)
-CREATE POLICY "Users read own data"
-  ON public.users
-  FOR SELECT
-  TO authenticated
-  USING (auth.uid() = id);
-
--- 4. Política para studies (usando variável de sessão ou campo direto)
-CREATE POLICY "Studies by plant"
-  ON public.studies
-  FOR ALL
-  TO authenticated
-  USING (plant_id IN (
-    SELECT plant_id FROM public.users WHERE id = auth.uid()
-  ))
-  WITH CHECK (plant_id IN (
-    SELECT plant_id FROM public.users WHERE id = auth.uid()
-  ));
-
--- 5. Política para plants
-CREATE POLICY "Plants readable"
-  ON public.plants
-  FOR SELECT
-  TO authenticated
-  USING (true);
-
--- 6. Garantir que o usuário existe em public.users
-INSERT INTO public.users (id, email, plant_id, role)
-VALUES (
-  'UUID-DO-USUARIO-AQUI',
-  'ra.admin@rochling.com',
-  1,
-  'admin'
-)
-ON CONFLICT (id) DO UPDATE SET plant_id = 1, role = 'admin';`
-  } else if (error.code === '42501' || error.message?.includes('permission denied')) {
-    title = '⚠️ Permissão Negada (RLS)'
-    message = 'O usuário autenticado não tem permissão para acessar esta tabela. Verifique se as políticas RLS estão configuradas corretamente.'
-    sql = `-- Execute no SQL Editor do Supabase:
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users read own data"
-  ON public.users FOR SELECT TO authenticated
-  USING (auth.uid() = id);`
+// Inicializar Supabase
+function initSupabase() {
+  if (!window.supabase) {
+    setTimeout(initSupabase, 100);
+    return;
   }
+  
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  console.log('[DB] Supabase inicializado');
+  
+  // Monitorar autenticação AQUI DENTRO
+  supabase.auth.onAuthStateChange(function(event, session) {
+    var gate = $('authGate');
+    var app = document.querySelector('.app');
+    var badge = $('userBadge');
 
-  panel.innerHTML = `
-    <div class="rls-error-box">
-      <h3>${title}</h3>
-      <p>${message}</p>
-      <p style="margin-top:8px;color:var(--t2);font-size:13px;">Código do erro: <code>${error.code || 'N/A'}</code></p>
-      ${sql ? `<p style="margin-top:12px;font-weight:600;">Copie e execute este SQL no Supabase:</p><pre>${sql}</pre>` : ''}
-    </div>
-  `
-  show(panel)
+    if (session && session.user) {
+      console.log('[AUTH] Logado:', session.user.email);
+      gate.style.display = 'none';
+      app.style.display = 'flex';
+      badge.textContent = session.user.email;
+      badge.style.display = '';
+      setTimeout(window._dbInit, 100);
+    } else {
+      console.log('[AUTH] Deslogado');
+      gate.style.display = 'flex';
+      app.style.display = 'none';
+      badge.style.display = 'none';
+    }
+  });
 }
 
-// ═══════════════════════════════════════════════════════
-// SUPABASE INITIALIZATION
-// ═══════════════════════════════════════════════════════
+initSupabase();
 
-// IMPORTANTE: Configure aqui suas credenciais do Supabase!
-const SUPABASE_URL = 'https://ladbighqhfjxybydcfya.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhZGJpZ2hxaGZqeHlieWRjZnlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTYxNTgsImV4cCI6MjA5Njc3MjE1OH0._Fdr55VlHXunQIOx_dyVLienxuj2H_D_6IpKvT8Mfe0'
-
-if (SUPABASE_URL === 'https://seu-projeto.supabase.co') {
-  alert('⚠️ CONFIGURE AS CREDENCIAIS DO SUPABASE NO CÓDIGO!')
-}
-
-// CORREÇÃO: Verificar se o Supabase carregou corretamente (UMD via unpkg)
-if (typeof supabase === 'undefined' || !supabase.createClient) {
-  console.error('❌ Supabase client não carregou! Verifique a conexão com a internet.')
-  logDebug('ERRO: Supabase client não carregou (file:// bloqueia CDN)')
-  document.body.innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;"><h2>⚠️ Erro de Carregamento</h2><p>O Supabase não pôde ser carregado porque você está abrindo este arquivo localmente (<code>file://</code>).</p><p><strong>Soluções:</strong></p><ol style="text-align:left;max-width:500px;margin:20px auto;"><li>Use um servidor local: <code>npx serve .</code> ou <code>python -m http.server 8080</code></li><li>Ou abra via VS Code com Live Server</li><li>Ou hospede em um servidor web</li></ol></div>'
-  throw new Error('Supabase not loaded')
-}
-
-window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true
+// APIs
+window.DB = {
+  saveStudy: async function(study) {
+    var { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) throw new Error('Não autenticado');
+    
+    var { error } = await supabase.from('studies').upsert({
+      id: study.id,
+      data: study,
+      user_id: session.user.id
+    }, { onConflict: 'id' });
+    
+    if (error) throw error;
+    console.log('[DB] Salvo:', study.id);
   },
-  realtime: {
-    params: {
-      eventsPerSecond: 10
-    }
+
+  deleteStudy: async function(id) {
+    var { error } = await supabase.from('studies').delete().eq('id', id);
+    if (error) throw error;
+    console.log('[DB] Deletado:', id);
+  },
+
+  getAll: async function() {
+    var { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) throw new Error('Não autenticado');
+    
+    var { data, error } = await supabase.from('studies').select('data').eq('user_id', session.user.id);
+    if (error) throw error;
+    
+    var studies = (data || []).map(r => r.data);
+    console.log('[DB] Recuperados:', studies.length);
+    return studies;
+  },
+
+  listen: function(callback) {
+    supabase.channel('schema-db-changes-studies')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'studies' }, async () => {
+        var studies = await window.DB.getAll();
+        callback(studies);
+      })
+      .subscribe(() => console.log('[DB] Realtime ativo'));
   }
-})
+};
 
-// Alias global para compatibilidade
-window.supabase = window.supabaseClient
+window.AUTH = {
+  login: async (email, pass) => {
+    var { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+    if (error) throw error;
+    return data.user;
+  },
 
-// ═══════════════════════════════════════════════════════
-// AUTH HANDLERS
-// ═══════════════════════════════════════════════════════
-
-$('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault()
-  const email = $('loginEmail').value.trim()
-  const password = $('loginPassword').value.trim()
-
-  if (!email || !password) {
-    showToast('Preencha email e senha', 'error')
-    return
+  logout: async () => {
+    var { error } = await supabase.auth.signOut();
+    if (error) throw error;
   }
+};
 
-  setLoading(true)
+// UI
+window.handleLogin = async function(e) {
+  e.preventDefault();
   try {
-    const { data, error } = await window.supabaseClient.auth.signInWithPassword({
-      email: email,
-      password: password
-    })
-
-    if (error) throw error
-    showToast('Login realizado com sucesso!', 'success')
-    $('loginForm').reset()
-    $('authError').style.display = 'none'
-  } catch(e) {
-    console.error('[LOGIN] Erro:', e)
-    showToast('Erro ao fazer login: ' + e.message, 'error')
-    $('authError').textContent = '❌ ' + e.message
-    $('authError').style.display = 'block'
-  } finally {
-    setLoading(false)
+    await window.AUTH.login($('loginEmail').value, $('loginPassword').value);
+    $('loginError').textContent = '';
+    $('loginForm').reset();
+  } catch (err) {
+    $('loginError').textContent = 'Erro: ' + err.message;
   }
-})
+};
 
-$('btnLogout')?.addEventListener('click', async () => {
-  if(!confirm('Tem certeza que deseja sair?')) return
+window.handleLogout = async function() {
+  if (!confirm('Sair?')) return;
   try {
-    // Limpar subscription antes do logout
-    if (window._studyChannel) {
-      window._studyChannel.unsubscribe()
-      window._studyChannel = null
-    }
-    await window.supabaseClient.auth.signOut()
-    showToast('Logout realizado', 'success')
-  } catch(e) {
-    console.error('[LOGOUT] Erro:', e)
-    showToast('Erro ao fazer logout: ' + e.message, 'error')
+    await window.AUTH.logout();
+  } catch (err) {
+    alert('Erro: ' + err.message);
   }
-})
+};
 
-// ═══════════════════════════════════════════════════════
-// DATA FUNCTIONS
-// ═══════════════════════════════════════════════════════
+window.createNewStudy = function() {
+  currentStudy = {
+    id: 'study_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+    name: 'Novo Estudo',
+    description: '',
+    lsl: 0,
+    nominal: 0,
+    usl: 10,
+    measurements: [],
+    createdAt: new Date().toISOString()
+  };
+  openStudyModal();
+};
 
-window._fetchStudies = async function() {
-  if (!window._currentPlantId) {
-    console.warn('[FETCH] Sem plant_id definido')
-    return []
-  }
+window.openStudyModal = function() {
+  $('studyName').value = currentStudy.name;
+  $('studyDescription').value = currentStudy.description;
+  $('studyLSL').value = currentStudy.lsl;
+  $('studyNominal').value = currentStudy.nominal;
+  $('studyUSL').value = currentStudy.usl;
+  $('studyMeasurements').value = currentStudy.measurements.join('\n');
+  $('studyModal').classList.add('open');
+};
 
+window.closeStudyModal = function() {
+  $('studyModal').classList.remove('open');
+};
+
+window.saveStudyFromModal = async function() {
   try {
-    console.log('[FETCH] Buscando estudos para plant_id:', window._currentPlantId)
+    currentStudy.name = $('studyName').value || 'Sem nome';
+    currentStudy.description = $('studyDescription').value;
+    currentStudy.lsl = parseFloat($('studyLSL').value) || 0;
+    currentStudy.nominal = parseFloat($('studyNominal').value) || 0;
+    currentStudy.usl = parseFloat($('studyUSL').value) || 10;
+    currentStudy.measurements = $('studyMeasurements').value.split('\n').map(m => parseFloat(m)).filter(v => !isNaN(v));
 
-    const { data, error } = await window.supabaseClient
-      .from('studies')
-      .select('*')
-      .eq('plant_id', window._currentPlantId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('[FETCH] Erro Supabase:', error)
-      throw error
-    }
-
-    console.log('[FETCH] Estudos retornados:', data?.length || 0)
-    window._studies = data || []
-    return data || []
-  } catch(e) {
-    console.error('[FETCH] Error fetching studies:', e)
-    showToast('Erro ao carregar estudos: ' + e.message, 'error')
-    logDebug(`ERRO FETCH STUDIES: ${e.message}\nCode: ${e.code || 'N/A'}`)
-    return []
+    await window.DB.saveStudy(currentStudy);
+    closeStudyModal();
+    await loadStudies();
+  } catch (err) {
+    alert('Erro: ' + err.message);
   }
-}
+};
 
-window._fetchPlants = async function() {
+window.selectStudy = function(id) {
+  var study = allStudies.find(s => s.id === id);
+  if (study) {
+    currentStudy = study;
+    renderStudyView();
+    updateStudiesList();
+  }
+};
+
+window.deleteStudy = async function(id) {
+  if (!confirm('Deletar?')) return;
   try {
-    const { data, error } = await window.supabaseClient
-      .from('plants')
-      .select('*')
-      .order('name')
-
-    if (error) throw error
-    window._plants = data || []
-    return data || []
-  } catch(e) {
-    console.error('[FETCH] Error fetching plants:', e)
-    return []
-  }
-}
-
-window._renderStudies = function() {
-  const container = $('studiesList')
-  if (!container) return
-
-  const studies = window._studies || []
-
-  if (!studies || studies.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📊</div><div class="empty-state-title">Nenhum estudo de capabilidade encontrado</div><p style="color:var(--t3);font-size:13px;margin-top:8px;">Verifique se existem políticas RLS configuradas no Supabase</p></div>'
-    return
-  }
-
-  let html = '<div class="table-container"><table>'
-  html += '<thead><tr><th>Título</th><th>Processo</th><th>Dados</th><th>Cp</th><th>Cpk</th></tr></thead>'
-  html += '<tbody>'
-
-  studies.forEach(study => {
-    let measurements = []
-    try {
-      measurements = JSON.parse(study.measurements || '[]')
-    } catch(e) {
-      measurements = []
+    await window.DB.deleteStudy(id);
+    if (currentStudy?.id === id) {
+      currentStudy = null;
+      renderStudyView();
     }
-    const cp = calculateCP(study)
-    const cpk = calculateCPK(study)
+    await loadStudies();
+  } catch (err) {
+    alert('Erro: ' + err.message);
+  }
+};
 
-    html += '<tr>'
-    html += '<td><strong>' + (study.title || '-') + '</strong></td>'
-    html += '<td>' + (study.process_name || '-') + '</td>'
-    html += '<td>' + measurements.length + ' amostras</td>'
-    html += '<td>' + (cp ? cp.toFixed(3) : '-') + '</td>'
-    html += '<td>' + (cpk ? cpk.toFixed(3) : '-') + '</td>'
-    html += '</tr>'
-  })
-
-  html += '</tbody></table></div>'
-  container.innerHTML = html
+function updateStudiesList() {
+  var list = $('studiesList');
+  list.innerHTML = '';
+  allStudies.forEach(s => {
+    var item = document.createElement('div');
+    item.className = 'study-item' + (currentStudy?.id === s.id ? ' active' : '');
+    item.onclick = () => selectStudy(s.id);
+    item.innerHTML = '<div class="study-item-name">' + s.name + '</div>';
+    list.appendChild(item);
+  });
 }
 
-// ═══════════════════════════════════════════════════════
-// CALCULATIONS
-// ═══════════════════════════════════════════════════════
+function renderStudyView() {
+  if (!currentStudy) {
+    $('studyTitle').textContent = 'Selecione um estudo';
+    $('viewContent').innerHTML = '<p style="color:var(--t3);">Crie ou selecione um estudo.</p>';
+    return;
+  }
 
-function calculateCP(study) {
-  if (!study) return null
-  let measurements = []
+  $('studyTitle').textContent = currentStudy.name;
+
+  var m = currentStudy.measurements || [];
+  var n = m.length;
+  var mean = n > 0 ? m.reduce((a, b) => a + b) / n : 0;
+  var std = n > 0 ? Math.sqrt(m.reduce((a, v) => a + Math.pow(v - mean, 2), 0) / (n - 1 || 1)) : 0;
+  var cpk = std > 0 ? Math.min((currentStudy.usl - mean) / (3 * std), (mean - currentStudy.lsl) / (3 * std)) : 0;
+
+  $('viewContent').innerHTML = '<h2 style="margin:0 0 12px 0;">Resumo</h2>' +
+    '<table class="data-table"><tr><td>N</td><td>' + n + '</td></tr>' +
+    '<tr><td>Média</td><td>' + mean.toFixed(4) + '</td></tr>' +
+    '<tr><td>Desvio</td><td>' + std.toFixed(4) + '</td></tr>' +
+    '<tr><td>LSL</td><td>' + currentStudy.lsl + '</td></tr>' +
+    '<tr><td>USL</td><td>' + currentStudy.usl + '</td></tr>' +
+    '<tr><td>Cpk</td><td>' + cpk.toFixed(4) + '</td></tr></table>' +
+    '<div style="display:flex;gap:12px;margin-top:24px;">' +
+    '<button class="btn primary" onclick="openStudyModal()">✏️ Editar</button>' +
+    '<button class="btn danger" onclick="deleteStudy(\'' + currentStudy.id + '\')">🗑️ Deletar</button></div>';
+}
+
+async function loadStudies() {
   try {
-    measurements = JSON.parse(study.measurements || '[]')
-  } catch(e) { return null }
-
-  if (!study.lower_spec_limit || !study.upper_spec_limit || measurements.length < 2) return null
-
-  const usl = parseFloat(study.upper_spec_limit)
-  const lsl = parseFloat(study.lower_spec_limit)
-  if (isNaN(usl) || isNaN(lsl)) return null
-
-  const values = measurements.map(v => parseFloat(v)).filter(v => !isNaN(v))
-  if (values.length < 2) return null
-
-  const mean = values.reduce((a, b) => a + b, 0) / values.length
-  const variance = values.reduce((a, x) => a + Math.pow(x - mean, 2), 0) / (values.length - 1)
-  const sigma = Math.sqrt(variance)
-  if (sigma === 0) return null
-
-  return (usl - lsl) / (6 * sigma)
+    allStudies = await window.DB.getAll();
+    updateStudiesList();
+    renderStudyView();
+  } catch (err) {
+    console.error('[APP] Erro:', err);
+  }
 }
 
-function calculateCPK(study) {
-  if (!study) return null
-  let measurements = []
+window._dbInit = async function() {
+  console.log('[APP] Inicializando...');
   try {
-    measurements = JSON.parse(study.measurements || '[]')
-  } catch(e) { return null }
-
-  if (!study.lower_spec_limit || !study.upper_spec_limit || measurements.length < 2) return null
-
-  const usl = parseFloat(study.upper_spec_limit)
-  const lsl = parseFloat(study.lower_spec_limit)
-  if (isNaN(usl) || isNaN(lsl)) return null
-
-  const values = measurements.map(v => parseFloat(v)).filter(v => !isNaN(v))
-  if (values.length < 2) return null
-
-  const mean = values.reduce((a, b) => a + b, 0) / values.length
-  const variance = values.reduce((a, x) => a + Math.pow(x - mean, 2), 0) / (values.length - 1)
-  const sigma = Math.sqrt(variance)
-  if (sigma === 0) return null
-
-  const cpupper = (usl - mean) / (3 * sigma)
-  const clower = (mean - lsl) / (3 * sigma)
-
-  return Math.min(cpupper, clower)
-}
-
-// ═══════════════════════════════════════════════════════
-// REALTIME SUBSCRIPTIONS
-// ═══════════════════════════════════════════════════════
-
-window._subscribeToStudies = function() {
-  if (!window._currentPlantId) return
-
-  // Remover subscription anterior se existir
-  if (window._studyChannel) {
-    try {
-      window._studyChannel.unsubscribe()
-    } catch(e) {
-      console.warn('[REALTIME] Erro ao remover canal anterior:', e)
-    }
-    window._studyChannel = null
+    await loadStudies();
+    window.DB.listen(studies => {
+      allStudies = studies;
+      updateStudiesList();
+      renderStudyView();
+    });
+    console.log('[APP] Pronto!');
+  } catch (err) {
+    console.error('[APP] Erro:', err);
   }
-
-  const channelName = `studies:plant:${window._currentPlantId}`
-  console.log('[REALTIME] Subscrevendo canal:', channelName)
-
-  window._studyChannel = window.supabaseClient
-    .channel(channelName)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'studies',
-        filter: `plant_id=eq.${window._currentPlantId}`
-      },
-      (payload) => {
-        console.log('📡 Realtime update:', payload)
-        // Recarregar dados sem await (evita deadlock)
-        window._fetchStudies().then(() => {
-          window._renderStudies()
-        }).catch(err => {
-          console.error('[REALTIME] Erro ao recarregar:', err)
-        })
-      }
-    )
-    .subscribe((status) => {
-      console.log('[REALTIME] Status subscription:', status)
-      if (status === 'SUBSCRIBED') {
-        logDebug(`Realtime: conectado ao canal ${channelName}`)
-      } else if (status === 'CHANNEL_ERROR') {
-        logDebug(`Realtime: ERRO no canal ${channelName}`)
-      }
-    })
-}
-
-// ═══════════════════════════════════════════════════════
-// AUTH STATE LISTENER — CORREÇÃO CRÍTICA: SEM ASYNC NO CALLBACK
-// ═══════════════════════════════════════════════════════
-
-// Flag para prevenir race conditions
-let _authHandling = false
-
-window.supabaseClient.auth.onAuthStateChange((event, session) => {
-  console.log('[AUTH EVENT]', event, session?.user?.email)
-  logDebug(`Auth event: ${event} | User: ${session?.user?.email || 'none'}`)
-
-  // CORREÇÃO CRÍTICA #1: NÃO fazer chamadas async dentro do callback!
-  // Usar setTimeout(0) para sair do contexto síncrono do callback
-  // e evitar o deadlock documentado em https://github.com/supabase/gotrue-js/issues/762
-
-  if (event === 'SIGNED_IN' && session) {
-    setTimeout(() => handleSignIn(session), 0)
-  } else if (event === 'SIGNED_OUT') {
-    setTimeout(() => handleSignOut(), 0)
-  } else if (event === 'TOKEN_REFRESHED' && session) {
-    setTimeout(() => handleTokenRefresh(session), 0)
-  } else if (event === 'INITIAL_SESSION' && session) {
-    setTimeout(() => handleSignIn(session), 0)
-  } else if (event === 'INITIAL_SESSION' && !session) {
-    setTimeout(() => handleSignOut(), 0)
-  }
-})
-
-// Handler assíncrono separado (fora do callback do onAuthStateChange)
-async function handleSignIn(session) {
-  if (_authHandling) {
-    console.log('[AUTH] Handler já em execução, ignorando...')
-    return
-  }
-  _authHandling = true
-
-  try {
-    console.log('✅ Usuário autenticado:', session.user.email)
-    window._currentUser = session.user
-
-    // CORREÇÃO CRÍTICA #2: Buscar dados do usuário COM tratamento de erros completo
-    const { data: userData, error: userError } = await window.supabaseClient
-      .from('users')
-      .select('*')
-      .eq('id', session.user.id)
-      .maybeSingle()  // .maybeSingle() em vez de .single() para evitar PGRST116
-
-    if (userError) {
-      console.error('[AUTH] Erro ao buscar usuário:', userError)
-      logDebug(`ERRO users table: ${userError.message}\nCode: ${userError.code}`)
-
-      // Mostrar erro RLS específico na interface
-      showRLSError(userError)
-
-      // Se for erro de permissão (RLS), mostrar mensagem específica
-      if (userError.code === '42501' || userError.message?.includes('permission denied')) {
-        showToast('Erro de permissão: verifique as políticas RLS da tabela users', 'error')
-      } else if (userError.code === '42P17') {
-        showToast('Erro RLS: recursão infinita detectada. Corrija as políticas no Supabase.', 'error')
-      } else {
-        showToast('Erro ao carregar dados do usuário: ' + userError.message, 'error')
-      }
-
-      await window.supabaseClient.auth.signOut()
-      _authHandling = false
-      return
-    }
-
-    if (!userData) {
-      console.warn('⚠️ Usuário não encontrado na tabela users')
-      logDebug('Usuário autenticado mas NÃO encontrado em public.users')
-      showToast('Usuário não configurado. Contate o administrador.', 'error')
-      await window.supabaseClient.auth.signOut()
-      _authHandling = false
-      return
-    }
-
-    window._currentUserData = userData
-    window._currentPlantId = userData.plant_id
-
-    logDebug(`User data carregado: plant_id=${userData.plant_id}, role=${userData.role || 'N/A'}`)
-
-    // Update UI
-    const badge = $('topbarPlantBadge')
-    if (badge) {
-      badge.textContent = '🏭 ' + (userData.plant_id ? `Fábrica ${userData.plant_id}` : 'Admin')
-      badge.style.display = ''
-    }
-
-    // Mostrar botões conforme permissão
-    if (userData.role === 'admin') {
-      show($('btnAdminPanel'))
-    }
-    show($('btnNewStudy'))
-
-    // CORREÇÃO CRÍTICA #3: Carregar dados ANTES de mostrar a app
-    if (window._currentPlantId) {
-      show($('studiesList'))
-      $('studiesList').innerHTML = '<div class="empty-state"><div class="spinner"></div><div class="empty-state-title">Carregando estudos...</div></div>'
-
-      await window._fetchStudies()
-      window._renderStudies()
-    } else {
-      $('studiesList').innerHTML = '<div class="empty-state"><div class="empty-state-icon">🏭</div><div class="empty-state-title">Sem fábrica atribuída</div></div>'
-    }
-
-    // Subscribe to realtime (depois de carregar dados)
-    window._subscribeToStudies()
-
-    // Mostrar app
-    hide($('authGate'))
-    show($('app'))
-    $('app').classList.add('open')
-
-    console.log('✅ App loaded successfully')
-    logDebug('App carregada com sucesso')
-
-  } catch(e) {
-    console.error('[AUTH] Erro inesperado:', e)
-    logDebug(`ERRO CRÍTICO: ${e.message}`)
-    showToast('Erro crítico: ' + e.message, 'error')
-    try {
-      await window.supabaseClient.auth.signOut()
-    } catch(signOutErr) {
-      console.error('[AUTH] Erro ao fazer signOut:', signOutErr)
-    }
-  } finally {
-    _authHandling = false
-  }
-}
-
-async function handleSignOut() {
-  console.log('[AUTH] Usuário desautenticado')
-  window._currentUser = null
-  window._currentUserData = null
-  window._currentPlantId = null
-  window._studies = []
-
-  // Limpar subscription
-  if (window._studyChannel) {
-    try {
-      window._studyChannel.unsubscribe()
-    } catch(e) {}
-    window._studyChannel = null
-  }
-
-  const appEl = $('app')
-  const authGate = $('authGate')
-
-  if (appEl) {
-    hide(appEl)
-    appEl.classList.remove('open')
-  }
-  if (authGate) show(authGate)
-
-  const form = $('loginForm')
-  if (form) form.reset()
-
-  const errorDiv = $('authError')
-  if (errorDiv) errorDiv.style.display = 'none'
-
-  // Resetar UI
-  const badge = $('topbarPlantBadge')
-  if (badge) badge.style.display = 'none'
-  hide($('btnNewStudy'))
-  hide($('btnAdminPanel'))
-
-  // Esconder painel de erro RLS
-  hide($('rlsErrorPanel'))
-
-  logDebug('Usuário deslogado')
-}
-
-async function handleTokenRefresh(session) {
-  console.log('[AUTH] Token refreshed for:', session.user.email)
-  window._currentUser = session.user
-  // Não precisa recarregar tudo, apenas atualizar referência
-}
-
-// ═══════════════════════════════════════════════════════
-// INICIALIZAÇÃO — VERIFICAR SESSÃO EXISTENTE
-// ═══════════════════════════════════════════════════════
-
-async function initApp() {
-  console.log('🚀 Inicializando app...')
-  logDebug('Inicializando app...')
-
-  try {
-    const { data: { session }, error } = await window.supabaseClient.auth.getSession()
-
-    if (error) {
-      console.error('[INIT] Erro ao verificar sessão:', error)
-      logDebug(`Erro getSession: ${error.message}`)
-      return
-    }
-
-    if (session) {
-      console.log('[INIT] Sessão existente encontrada:', session.user.email)
-      logDebug(`Sessão existente: ${session.user.email}`)
-      // O onAuthStateChange vai disparar com INITIAL_SESSION
-      // Mas se não disparar, chamamos manualmente:
-      if (!window._currentUser) {
-        await handleSignIn(session)
-      }
-    } else {
-      console.log('[INIT] Nenhuma sessão ativa')
-      logDebug('Nenhuma sessão ativa')
-      handleSignOut()
-    }
-  } catch(e) {
-    console.error('[INIT] Erro:', e)
-    logDebug(`Erro de inicialização: ${e.message}`)
-  }
-}
-
-// Iniciar quando DOM estiver pronto
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initApp)
-} else {
-  initApp()
-}
-
-console.log('═══════════════════════════════════════════════════════')
-console.log('🚀 SaaS CP/CPK SUPABASE — CORRIGIDO E OTIMIZADO v2.2')
-console.log('═══════════════════════════════════════════════════════')
+};
 </script>
 
 </body>
