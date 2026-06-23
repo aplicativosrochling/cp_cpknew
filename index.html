@@ -10,29 +10,33 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <!-- Supabase JS Client via CDN -->
-<script src="https://unpkg.com/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
-<script>
-  // Verify Supabase loaded correctly
-  if (typeof supabase === 'undefined' || !supabase.createClient) {
-    console.error('[SB] ERRO: Supabase library failed to load from CDN!');
-  } else {
-    console.log('[SB] Supabase library loaded successfully.');
-  }
-</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 
 <script>
-
 /* ═══════════════════════════════════════════════════════════════════════════════
-   SUPABASE INITIALIZATION — CORRIGIDO (v2)
+   SUPABASE INITIALIZATION — Substitui o bloco Firebase original
    ═══════════════════════════════════════════════════════════════════════════════ */
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ⚠️  SUBSTITUA ESTES VALORES PELOS DO SEU PROJETO SUPABASE
+//     Project Settings → API → URL e anon/public key
+// ═══════════════════════════════════════════════════════════════════════════════
 var SUPABASE_URL = 'https://ladbighqhfjxybydcfya.supabase.co';
 var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhZGJpZ2hxaGZqeHlieWRjZnlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTYxNTgsImV4cCI6MjA5Njc3MjE1OH0._Fdr55VlHXunQIOx_dyVLienxuj2H_D_6IpKvT8Mfe0';
 
-(function() {
+function initSupabaseClient() {
   try {
+    // Verifica se a biblioteca Supabase está disponível
+    if (!window.supabase || !window.supabase.createClient) {
+      console.error('[SB] ❌ Biblioteca Supabase não carregada. Aguardando...');
+      setTimeout(initSupabaseClient, 100);
+      return;
+    }
+    
+    console.log('[SB] ✓ Biblioteca Supabase detectada. Inicializando cliente...');
+    
     // ── Inicializa o cliente Supabase ──
-    var supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    var supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
@@ -60,61 +64,12 @@ var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
           .select('*, plants:plant_id(*)')
           .eq('id', userId)
           .single();
-        if (error) { 
-          console.warn('[SB] Erro perfil:', error.message); 
-          if (error.code === 'PGRST116') {
-            console.log('[SB] Perfil não existe. Tentando auto-provisionar...');
-            return await createDefaultProfile(userId);
-          }
-          return null; 
-        }
+        if (error) { console.warn('[SB] Erro perfil:', error.message); return null; }
         return data;
       } catch (e) { console.error('[SB] Exceção perfil:', e); return null; }
     }
 
-    // ── Helper: criar perfil padrão se não existir ──
-    async function createDefaultProfile(userId) {
-      try {
-        var defaultPlantId = null;
-        var { data: plants, error: plantErr } = await supabaseClient
-          .from('plants')
-          .select('id, code, name')
-          .eq('is_active', true)
-          .order('created_at', { ascending: true })
-          .limit(1);
-
-        if (plants && plants.length > 0) {
-          defaultPlantId = plants[0].id;
-          console.log('[SB] Planta padrão encontrada:', plants[0].code);
-        } else {
-          console.warn('[SB] Nenhuma planta ativa encontrada!');
-        }
-
-        var { data: newProfile, error: insertErr } = await supabaseClient
-          .from('profiles')
-          .insert({
-            id: userId,
-            plant_id: defaultPlantId,
-            email: currentSession.user.email,
-            role: 'user',
-            is_active: true
-          })
-          .select('*, plants:plant_id(*)')
-          .single();
-
-        if (insertErr) {
-          console.error('[SB] Erro ao criar perfil:', insertErr.message);
-          return null;
-        }
-        console.log('[SB] Perfil criado com sucesso para:', userId);
-        return newProfile;
-      } catch (e) {
-        console.error('[SB] Exceção ao criar perfil:', e);
-        return null;
-      }
-    }
-
-    // ── Helper: converter row Supabase → objeto estudo ──
+    // ── Helper: converter row Supabase → objeto estudo (compatível com Firestore) ──
     function studyFromRow(row) {
       if (!row) return null;
       return {
@@ -194,81 +149,6 @@ var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
       } catch (e) { console.warn('[SB] Ping exceção:', e.message); }
     }
 
-    // ── NOVO: Processar autenticação de forma segura (fora do onAuthStateChange) ──
-    async function processAuthSession(session) {
-      if (!session || !session.user) {
-        console.log('[SB] Sem usuário.');
-        currentProfile = null; currentPlant = null;
-        var gate = document.getElementById('authGate');
-        var appEl = document.querySelector('.app');
-        var userBadge = document.getElementById('userBadge');
-        if (gate) gate.style.display = 'flex';
-        if (appEl) appEl.style.display = 'none';
-        if (userBadge) userBadge.style.display = 'none';
-        window.FB = null;
-        if (realtimeChannel) { supabaseClient.removeChannel(realtimeChannel); realtimeChannel = null; }
-        return;
-      }
-
-      try {
-        currentProfile = await fetchUserProfile(session.user.id);
-
-        if (!currentProfile) {
-          console.warn('[SB] AVISO: Perfil ainda não disponível após auto-provisioning.');
-          currentProfile = {
-            id: session.user.id,
-            email: session.user.email,
-            role: 'user',
-            plant_id: null,
-            plants: null
-          };
-        }
-
-        currentPlant = currentProfile && currentProfile.plants ? currentProfile.plants : null;
-
-        console.log('[SB] Auth:', session.user.email,
-          '| Role:', currentProfile ? currentProfile.role : '?',
-          '| Plant:', currentPlant ? currentPlant.code : '(nenhuma)');
-
-        // MOSTRAR APLICAÇÃO
-        var gate = document.getElementById('authGate');
-        var appEl = document.querySelector('.app');
-        var userBadge = document.getElementById('userBadge');
-
-        if (gate) gate.style.display = 'none';
-        if (appEl) appEl.style.display = '';
-
-        // ATUALIZAR BADGE DO USUÁRIO
-        if (userBadge) {
-          var txt = session.user.email;
-          if (currentPlant) txt += ' · ' + currentPlant.code;
-          if (currentProfile && currentProfile.role === 'admin') txt += ' [ADMIN]';
-          userBadge.textContent = txt;
-          userBadge.style.display = '';
-        }
-
-        // INICIALIZAR APLICAÇÃO
-        exposeFB();
-        if (typeof window._fbInit === 'function') {
-          try {
-            window._fbInit();
-          } catch (e) {
-            console.error('[SB] Erro ao executar _fbInit:', e);
-          }
-        }
-
-        // ATUALIZAR STATUS DE SINCRONIZAÇÃO
-        var syncEl = document.getElementById('dashSyncState');
-        if (syncEl) syncEl.textContent = 'online · ' + (currentPlant ? currentPlant.code : 'sem-planta');
-      } catch (e) {
-        console.error('[SB] ERRO CRÍTICO durante autenticação:', e);
-        var gate = document.getElementById('authGate');
-        var appEl = document.querySelector('.app');
-        if (gate) gate.style.display = 'none';
-        if (appEl) appEl.style.display = '';
-      }
-    }
-
     // ── Expor window.FB (assinaturas idênticas ao Firebase) ──
     function exposeFB() {
       if (window.FB) return;
@@ -307,6 +187,7 @@ var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
               .order('created_at', { ascending: false });
             if (error) { 
               console.error('[SB] getAll falhou:', error.message); 
+              // Se falhar por RLS, tenta sem ordenação
               if (error.message && error.message.includes('infinite recursion')) {
                 console.warn('[SB] Tentando getAll sem relacionamentos...');
                 var { data: data2, error: error2 } = await supabaseClient
@@ -374,22 +255,39 @@ var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
       }
     };
 
-    // ── CORREÇÃO CRÍTICA: Listener de estado de auth SEM async calls ──
-    supabaseClient.auth.onAuthStateChange(function(event, session) {
+    // ── Listener de estado de auth ──
+    supabaseClient.auth.onAuthStateChange(async function(event, session) {
       console.log('[SB] Auth state:', event);
+      var gate = document.getElementById('authGate');
+      var appEl = document.querySelector('.app');
+      var userBadge = document.getElementById('userBadge');
+
       currentSession = session;
 
-      // CRÍTICO: NÃO fazer chamadas async dentro do callback!
-      // Usar setTimeout para processar fora do contexto do callback
       if (session && session.user) {
-        setTimeout(function() {
-          processAuthSession(session);
-        }, 0);
+        currentProfile = await fetchUserProfile(session.user.id);
+        currentPlant   = currentProfile ? currentProfile.plants : null;
+
+        console.log('[SB] Auth:', session.user.email,
+          '| Role:', currentProfile ? currentProfile.role : '?',
+          '| Plant:', currentPlant ? currentPlant.code : '?');
+
+        if (gate) gate.style.display = 'none';
+        if (appEl) appEl.style.display = '';
+        if (userBadge) {
+          var txt = session.user.email;
+          if (currentPlant) txt += ' · ' + currentPlant.code;
+          if (currentProfile && currentProfile.role === 'admin') txt += ' [ADMIN]';
+          userBadge.textContent = txt;
+          userBadge.style.display = '';
+        }
+        exposeFB();
+        if (typeof window._fbInit === 'function') window._fbInit();
+
+        var syncEl = document.getElementById('dashSyncState');
+        if (syncEl) syncEl.textContent = 'online · ' + (currentPlant ? currentPlant.code : '?');
       } else {
-        // Sem sessão - mostrar login imediatamente
-        var gate = document.getElementById('authGate');
-        var appEl = document.querySelector('.app');
-        var userBadge = document.getElementById('userBadge');
+        console.log('[SB] Sem usuário.');
         currentProfile = null; currentPlant = null;
         if (gate) gate.style.display = 'flex';
         if (appEl) appEl.style.display = 'none';
@@ -404,15 +302,36 @@ var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
       var { data: { session } } = await supabaseClient.auth.getSession();
       if (session) {
         currentSession = session;
-        // Processar fora do onAuthStateChange para evitar deadlock
-        await processAuthSession(session);
+        currentProfile = await fetchUserProfile(session.user.id);
+        currentPlant   = currentProfile ? currentProfile.plants : null;
       }
       setTimeout(testConnection, 1000);
     })();
 
-  } catch (e) { console.error('[SB] ERRO CRÍTICO:', e); }
-})();
+  } catch (e) { 
+    console.error('[SB] ❌ ERRO CRÍTICO na inicialização:', e);
+    console.error('[SB] Stack:', e.stack);
+  }
+}
 
+// ── Iniciar quando o Supabase estiver carregado ──
+function startInit() {
+  if (window.supabase && window.supabase.createClient) {
+    console.log('[SB] ✓ Iniciando Supabase...');
+    initSupabaseClient();
+  } else {
+    console.warn('[SB] ⏳ Supabase ainda não disponível, aguardando...');
+    setTimeout(startInit, 100);
+  }
+}
+
+// Aguardar o DOM estar pronto
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startInit);
+} else {
+  startInit();
+}
+</script>
 
 <style>
 
@@ -1922,7 +1841,6 @@ body.has-custom-branding #printPageHeader .cph-std{
   margin-top:1px;
 }
 </style>
-<base target="_blank">
 </head>
 
 <body>
