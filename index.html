@@ -10,7 +10,15 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <!-- Supabase JS Client via CDN -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+<script>
+  // Verify Supabase loaded correctly
+  if (typeof supabase === 'undefined' || !supabase.createClient) {
+    console.error('[SB] ERRO: Supabase library failed to load from CDN!');
+  } else {
+    console.log('[SB] Supabase library loaded successfully.');
+  }
+</script>
 
 <script>
 
@@ -43,7 +51,6 @@ var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
     var currentPlant   = null;
     var realtimeChannel = null;
     var _fbInitialized = false;
-    var _pendingAuthSession = null; // NOVO: sessão pendente para processar fora do callback
 
     // ── Helper: buscar perfil do usuário ──
     async function fetchUserProfile(userId) {
