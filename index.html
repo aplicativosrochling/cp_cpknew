@@ -7049,6 +7049,17 @@ renderDashboard();
 .apl-pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .apl-pill.admin{background:#fef3c7;color:#92400e}
 .apl-pill.user{background:#e0e7ff;color:#3730a3}
+/* ── FIX: page-admin-plants vive fora de .app; quando ativo, vira overlay fullscreen ── */
+#page-admin-plants.active{
+  display:block !important;
+  position:fixed !important;
+  inset:0 !important;
+  width:100vw !important;
+  height:100vh !important;
+  overflow-y:auto !important;
+  background:#f8fafc !important;
+  z-index:9999 !important;
+}
 </style>
 
 <div class="page" id="page-admin-plants">
@@ -7324,10 +7335,12 @@ renderDashboard();
     };
   }
 
-  /* Marca que o ADM já escolheu uma planta — libera navegação normal */
+  /* Marca que o ADM já escolheu uma planta — libera navegação normal e remove overlay */
   var _origSelect=window.aplSelectPlant;
   window.aplSelectPlant=async function(){
     window.__aplPlantChosen=true;
+    var pg=document.getElementById('page-admin-plants');
+    if(pg){ pg.classList.remove('active'); pg.style.display='none'; }
     return _origSelect.apply(this,arguments);
   };
 
@@ -7395,29 +7408,34 @@ renderDashboard();
     }catch(e){ console.warn('[GT] init falhou',e); }
   };
   function _loadGT(){
+    /* Em file:// o Google Translate é bloqueado pelo navegador. Só carrega em http(s). */
+    if(location.protocol!=='http:' && location.protocol!=='https:'){
+      console.log('[GT] ⊘ Protocolo',location.protocol,'— Google Translate desabilitado. Usando i18n local.');
+      return;
+    }
     _injectGTContainer();
     if(document.getElementById('gt-script')) return;
     var s=document.createElement('script');
     s.id='gt-script';
     s.src='https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
     s.async=true;
+    s.onerror=function(){ console.warn('[GT] script falhou — i18n local segue ativo.'); };
     document.head.appendChild(s);
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',_loadGT); else _loadGT();
 
   /* setGoogleLanguage('en') — muda o idioma da página inteira */
   function _setGT(code){
+    /* Sem GT em file:// — silencioso */
+    if(location.protocol!=='http:' && location.protocol!=='https:') return;
     var lang=GT_MAP[code]||GT_MAP[(code||'').split('-')[0]]||'pt';
     var tryIt=function(attempt){
       var sel=document.querySelector('select.goog-te-combo');
       if(sel){
         sel.value=lang;
         sel.dispatchEvent(new Event('change'));
-        console.log('[GT] → idioma definido:',lang,'(de',code+')');
-      } else if(attempt<20){
+      } else if(attempt<10){
         setTimeout(function(){ tryIt(attempt+1); },400);
-      } else {
-        console.warn('[GT] combo não encontrado para',lang);
       }
     };
     tryIt(0);
