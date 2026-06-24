@@ -7490,6 +7490,308 @@ renderDashboard();
 
 </script>
 
+<!-- ═══ ADD-ON: Edição plantas/usuários + fallback tradução dinâmica ═══ -->
+<style>
+  .apl-modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px}
+  .apl-modal{background:#fff;border-radius:16px;padding:24px;max-width:480px;width:100%;box-shadow:0 30px 80px rgba(0,0,0,.3);font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif}
+  .apl-modal h3{margin:0 0 4px;font-size:20px;color:#0f172a}
+  .apl-modal p.sub{margin:0 0 16px;font-size:13px;color:#64748b}
+  .apl-modal label{display:block;font-size:12px;font-weight:600;color:#334155;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.3px}
+  .apl-modal input,.apl-modal select{width:100%;padding:9px 11px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;box-sizing:border-box}
+  .apl-modal .row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+  .apl-modal button{padding:9px 16px;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;border:1px solid transparent}
+  .apl-modal .btn-primary{background:#4f46e5;color:#fff}
+  .apl-modal .btn-ghost{background:#fff;color:#475569;border-color:#cbd5e1}
+  .apl-modal .btn-danger{background:#dc2626;color:#fff}
+  .apl-modal .msg{font-size:12px;margin-top:8px;min-height:16px}
+  .pc-btn-edit{margin-top:6px;width:100%;padding:8px;border:1px dashed #cbd5e1;background:#f8fafc;color:#475569;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer}
+  .pc-btn-edit:hover{background:#eef2ff;color:#4338ca;border-color:#a5b4fc}
+  .apl-uact{display:inline-flex;gap:4px}
+  .apl-uact button{padding:4px 8px;font-size:11px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-weight:600}
+  .apl-uact button:hover{background:#eef2ff;border-color:#a5b4fc;color:#4338ca}
+  .apl-uact button.danger:hover{background:#fee2e2;border-color:#fca5a5;color:#b91c1c}
+</style>
+<script>
+(function(){
+  function _c(){ return (window.AUTH && window.AUTH.client) || window.supabaseClient || null; }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+  function _lang(){ return (window.currentPlant&&window.currentPlant.language_code)||window._currentLanguage||'pt-BR'; }
+
+  function closeModal(){ var m=document.getElementById('__aplModal'); if(m) m.remove(); }
+  function openModal(html){
+    closeModal();
+    var bg=document.createElement('div');
+    bg.id='__aplModal'; bg.className='apl-modal-bg';
+    bg.innerHTML='<div class="apl-modal" onclick="event.stopPropagation()">'+html+'</div>';
+    bg.addEventListener('click',closeModal);
+    document.body.appendChild(bg);
+    try{ if(window.applyI18nToDOM) window.applyI18nToDOM(); }catch(e){}
+  }
+  window.aplCloseModal = closeModal;
+
+  /* EDITAR PLANTA */
+  window.aplEditPlant = async function(plantId){
+    var c=_c(); if(!c) return;
+    var { data:p, error } = await c.from('plants').select('*').eq('id',plantId).maybeSingle();
+    if(error||!p){ alert('Erro: '+(error&&error.message||'planta não encontrada')); return; }
+    openModal(
+      '<h3>✏️ <span data-i18n="admin.plants.editTitle">Editar Planta</span></h3>'+
+      '<p class="sub">Atualize os dados desta unidade fabril.</p>'+
+      '<label>Código</label><input id="_epCode" value="'+esc(p.code||'')+'">'+
+      '<label>Nome</label><input id="_epName" value="'+esc(p.name||'')+'">'+
+      '<label>País</label><input id="_epCtry" value="'+esc(p.country||'')+'">'+
+      '<label>Idioma</label>'+
+      '<select id="_epLang">'+
+        ['pt-BR','es-MX','en-US','de-DE','fr-FR','it-IT'].map(function(l){
+          return '<option value="'+l+'"'+(p.language_code===l?' selected':'')+'>'+l+'</option>';
+        }).join('')+'</select>'+
+      '<div class="msg" id="_epMsg"></div>'+
+      '<div class="row">'+
+        '<button class="btn-danger" onclick="aplDeletePlant(\''+esc(p.id)+'\')">Excluir</button>'+
+        '<button class="btn-ghost" onclick="aplCloseModal()">Cancelar</button>'+
+        '<button class="btn-primary" onclick="aplSavePlant(\''+esc(p.id)+'\')">Salvar</button>'+
+      '</div>'
+    );
+  };
+  window.aplSavePlant = async function(id){
+    var c=_c(); if(!c) return;
+    var msg=document.getElementById('_epMsg');
+    var payload={
+      code:document.getElementById('_epCode').value.trim(),
+      name:document.getElementById('_epName').value.trim(),
+      country:document.getElementById('_epCtry').value.trim(),
+      language_code:document.getElementById('_epLang').value
+    };
+    if(!payload.code||!payload.name){ msg.textContent='⚠ Código e Nome obrigatórios.'; msg.style.color='#b00'; return; }
+    msg.textContent='Salvando…'; msg.style.color='#475569';
+    var { error } = await c.from('plants').update(payload).eq('id',id);
+    if(error){ msg.textContent='❌ '+error.message; msg.style.color='#b00'; return; }
+    msg.textContent='✓ Salvo.'; msg.style.color='#0a7d3a';
+    if(window.aplRenderGrid) aplRenderGrid();
+    setTimeout(closeModal,500);
+  };
+  window.aplDeletePlant = async function(id){
+    if(!confirm('Excluir esta planta? Esta ação não pode ser desfeita.')) return;
+    var c=_c(); if(!c) return;
+    var { error } = await c.from('plants').delete().eq('id',id);
+    if(error){ alert('❌ '+error.message); return; }
+    closeModal();
+    if(window.aplRenderGrid) aplRenderGrid();
+    if(window.aplLoadUsers) aplLoadUsers();
+  };
+
+  /* EDITAR USUÁRIO */
+  window.aplEditUser = async function(userId){
+    var c=_c(); if(!c) return;
+    var [pRes,rRes,plRes] = await Promise.all([
+      c.from('profiles').select('*').eq('id',userId).maybeSingle(),
+      c.from('user_roles').select('role').eq('user_id',userId),
+      c.from('plants').select('id,code').order('code')
+    ]);
+    var u=pRes.data; if(!u){ alert('Usuário não encontrado.'); return; }
+    var roles=(rRes.data||[]).map(function(r){return r.role;});
+    var plants=plRes.data||[];
+    var isAdmin=roles.indexOf('admin')>=0;
+    openModal(
+      '<h3>✏️ Editar Usuário</h3>'+
+      '<p class="sub">Atualize nome, planta e papel.</p>'+
+      '<label>Nome completo</label><input id="_euName" value="'+esc(u.full_name||'')+'">'+
+      '<label>Planta</label>'+
+      '<select id="_euPlant"><option value="">—</option>'+
+        plants.map(function(pl){ return '<option value="'+pl.id+'"'+(pl.id===u.plant_id?' selected':'')+'>'+esc(pl.code)+'</option>'; }).join('')+
+      '</select>'+
+      '<label style="display:flex;align-items:center;gap:8px;margin-top:14px;text-transform:none;font-size:13px">'+
+        '<input type="checkbox" id="_euAdm" '+(isAdmin?'checked':'')+' style="width:auto"> '+
+        '<span>Conceder papel ADMIN</span></label>'+
+      '<div class="msg" id="_euMsg"></div>'+
+      '<div class="row">'+
+        '<button class="btn-danger" onclick="aplDeleteUser(\''+esc(u.id)+'\')">Excluir</button>'+
+        '<button class="btn-ghost" onclick="aplCloseModal()">Cancelar</button>'+
+        '<button class="btn-primary" onclick="aplSaveUser(\''+esc(u.id)+'\')">Salvar</button>'+
+      '</div>'
+    );
+  };
+  window.aplSaveUser = async function(id){
+    var c=_c(); if(!c) return;
+    var msg=document.getElementById('_euMsg');
+    msg.textContent='Salvando…'; msg.style.color='#475569';
+    var name=document.getElementById('_euName').value.trim();
+    var plant=document.getElementById('_euPlant').value||null;
+    var isAdm=document.getElementById('_euAdm').checked;
+    var { error:e1 } = await c.from('profiles').update({ full_name:name, plant_id:plant }).eq('id',id);
+    if(e1){ msg.textContent='❌ '+e1.message; msg.style.color='#b00'; return; }
+    try{
+      if(isAdm){
+        await c.from('user_roles').upsert({ user_id:id, role:'admin' },{ onConflict:'user_id,role' });
+      } else {
+        await c.from('user_roles').delete().eq('user_id',id).eq('role','admin');
+      }
+    }catch(e){}
+    msg.textContent='✓ Salvo.'; msg.style.color='#0a7d3a';
+    if(window.aplLoadUsers) aplLoadUsers();
+    setTimeout(closeModal,500);
+  };
+  window.aplDeleteUser = async function(id){
+    if(!confirm('Excluir perfil + papéis deste usuário?')) return;
+    var c=_c(); if(!c) return;
+    try{ await c.from('user_roles').delete().eq('user_id',id); }catch(e){}
+    var { error } = await c.from('profiles').delete().eq('id',id);
+    if(error){ alert('❌ '+error.message); return; }
+    closeModal();
+    if(window.aplLoadUsers) aplLoadUsers();
+  };
+
+  /* HOOK cards plantas → botão Editar */
+  var _origGrid = window.aplRenderGrid;
+  if(typeof _origGrid==='function'){
+    window.aplRenderGrid = async function(){
+      var r = await _origGrid.apply(this,arguments);
+      try{
+        document.querySelectorAll('#aplPlantGrid .plant-card').forEach(function(card){
+          if(card.querySelector('.pc-btn-edit')) return;
+          var id = card.getAttribute('data-plant-id'); if(!id) return;
+          var btn = document.createElement('button');
+          btn.className='pc-btn-edit';
+          btn.innerHTML='✏️ Editar';
+          btn.onclick = function(ev){ ev.stopPropagation(); window.aplEditPlant(id); };
+          card.appendChild(btn);
+        });
+        if(window.applyI18nToDOM) window.applyI18nToDOM();
+      }catch(e){ console.warn('[APL+] edit-buttons',e); }
+      return r;
+    };
+  }
+
+  /* HOOK tabela usuários → coluna Ações */
+  var _origUsers = window.aplLoadUsers;
+  if(typeof _origUsers==='function'){
+    window.aplLoadUsers = async function(){
+      var r = await _origUsers.apply(this,arguments);
+      try{
+        var thead = document.querySelector('#aplUserTable thead tr');
+        if(thead && !thead.querySelector('.__act')){
+          var th=document.createElement('th'); th.className='__act';
+          th.textContent='Ações'; thead.appendChild(th);
+        }
+        document.querySelectorAll('#aplUserRows tr').forEach(function(tr){
+          if(tr.querySelector('.__actcell')) return;
+          var uid=null;
+          var sel = tr.querySelector('select[onchange*="adminSetUserPlant"]');
+          if(sel){ var m=/adminSetUserPlant\(['"]([^'"]+)/.exec(sel.getAttribute('onchange')||''); if(m) uid=m[1]; }
+          if(!uid){
+            var cb=tr.querySelector('input[type="checkbox"][onchange*="adminToggleRole"]');
+            if(cb){ var m2=/adminToggleRole\(['"]([^'"]+)/.exec(cb.getAttribute('onchange')||''); if(m2) uid=m2[1]; }
+          }
+          var td=document.createElement('td'); td.className='__actcell';
+          if(uid){
+            td.innerHTML='<span class="apl-uact">'+
+              '<button onclick="aplEditUser(\''+uid+'\')" title="Editar">✏️</button>'+
+              '<button class="danger" onclick="aplDeleteUser(\''+uid+'\')" title="Excluir">🗑️</button></span>';
+          } else { td.textContent='—'; }
+          tr.appendChild(td);
+        });
+        if(window.applyI18nToDOM) window.applyI18nToDOM();
+      }catch(e){ console.warn('[APL+] user-actions',e); }
+      return r;
+    };
+  }
+
+  /* ── Fallback de tradução para texto dinâmico em PT (sem data-i18n) ── */
+  var DYNTRAD = {
+    'en-US':{
+      'Carregando…':'Loading…','Carregando...':'Loading...','Salvando…':'Saving…','Criando…':'Creating…',
+      'Nenhuma planta cadastrada.':'No plants registered.',
+      'Use o formulário abaixo para cadastrar a primeira unidade.':'Use the form below to register the first unit.',
+      'Acessar Planta':'Access Plant','Editar':'Edit','Salvar':'Save','Cancelar':'Cancel','Excluir':'Delete',
+      'Editar Planta':'Edit Plant','Editar Usuário':'Edit User',
+      'Atualize os dados desta unidade fabril.':'Update this facility data.',
+      'Atualize nome, planta e papel.':'Update name, plant and role.',
+      'Conceder papel ADMIN':'Grant ADMIN role','Nome completo':'Full name',
+      'Código':'Code','Nome':'Name','País':'Country','Localização / País':'Location / Country','Idioma':'Language','Idioma Padrão':'Default Language',
+      'Planta':'Plant','Papel':'Role','Ações':'Actions','Acessos & Operadores':'Access & Operators',
+      'Painel de Controle':'Control Panel','Gerenciamento de Plantas':'Plants Management',
+      'Selecione uma planta para operar ou cadastre uma nova unidade.':'Select a plant to operate or register a new unit.',
+      'Plantas':'Plants','Usuários':'Users','Nova Planta':'New Plant',
+      'Cadastre uma nova unidade fabril no sistema.':'Register a new facility in the system.',
+      '+ Criar planta':'+ Create plant','+ Criar usuário':'+ Create user',
+      'Associe logins existentes às plantas ou crie novos acessos.':'Associate existing logins with plants or create new accesses.',
+      'Criar acesso rápido para operador':'Quick-create access for operator',
+      '(sem nome)':'(no name)','Falha':'Failure','Sucesso':'Success','Entrar':'Sign in',
+      'Acesso restrito · faça login para continuar':'Restricted access · sign in to continue',
+      'Esqueci a senha':'Forgot password','E-mail':'Email','Senha':'Password'
+    },
+    'es-MX':{
+      'Carregando…':'Cargando…','Salvando…':'Guardando…','Criando…':'Creando…',
+      'Nenhuma planta cadastrada.':'No hay plantas registradas.',
+      'Acessar Planta':'Acceder a Planta','Editar':'Editar','Salvar':'Guardar','Cancelar':'Cancelar','Excluir':'Eliminar',
+      'Editar Planta':'Editar Planta','Editar Usuário':'Editar Usuario',
+      'Conceder papel ADMIN':'Conceder rol ADMIN','Nome completo':'Nombre completo',
+      'Código':'Código','Nome':'Nombre','País':'País','Localização / País':'Ubicación / País','Idioma':'Idioma','Idioma Padrão':'Idioma Predeterminado',
+      'Planta':'Planta','Papel':'Rol','Ações':'Acciones','Acessos & Operadores':'Accesos y Operadores',
+      'Painel de Controle':'Panel de Control','Gerenciamento de Plantas':'Gestión de Plantas',
+      'Plantas':'Plantas','Usuários':'Usuarios','Nova Planta':'Nueva Planta',
+      '+ Criar planta':'+ Crear planta','+ Criar usuário':'+ Crear usuario',
+      '(sem nome)':'(sin nombre)','Entrar':'Entrar','E-mail':'Correo','Senha':'Contraseña','Esqueci a senha':'Olvidé mi contraseña'
+    },
+    'de-DE':{
+      'Carregando…':'Lädt…','Salvando…':'Speichert…','Criando…':'Erstellt…',
+      'Nenhuma planta cadastrada.':'Keine Werke registriert.',
+      'Acessar Planta':'Werk öffnen','Editar':'Bearbeiten','Salvar':'Speichern','Cancelar':'Abbrechen','Excluir':'Löschen',
+      'Editar Planta':'Werk bearbeiten','Editar Usuário':'Benutzer bearbeiten',
+      'Conceder papel ADMIN':'ADMIN-Rolle vergeben','Nome completo':'Vollständiger Name',
+      'Código':'Code','Nome':'Name','País':'Land','Idioma':'Sprache','Idioma Padrão':'Standardsprache',
+      'Planta':'Werk','Papel':'Rolle','Ações':'Aktionen','Acessos & Operadores':'Zugriff & Bediener',
+      'Painel de Controle':'Steuerungspanel','Gerenciamento de Plantas':'Werksverwaltung',
+      'Plantas':'Werke','Usuários':'Benutzer','Nova Planta':'Neues Werk',
+      '+ Criar planta':'+ Werk anlegen','+ Criar usuário':'+ Benutzer anlegen',
+      '(sem nome)':'(ohne Name)','Entrar':'Anmelden','E-mail':'E-Mail','Senha':'Passwort','Esqueci a senha':'Passwort vergessen'
+    }
+  };
+  function _translateTextNodes(){
+    var lang=_lang();
+    var dict=DYNTRAD[lang]; if(!dict) return;
+    var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{
+      acceptNode:function(n){
+        var p=n.parentNode; if(!p) return NodeFilter.FILTER_REJECT;
+        var tag=p.nodeName;
+        if(tag==='SCRIPT'||tag==='STYLE'||tag==='TEXTAREA') return NodeFilter.FILTER_REJECT;
+        if(p.closest && p.closest('[data-i18n]')) return NodeFilter.FILTER_REJECT;
+        if(p.closest && p.closest('.goog-te-banner-frame,.skiptranslate')) return NodeFilter.FILTER_REJECT;
+        var v=n.nodeValue; if(!v||!v.trim()) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    var nodes=[],n; while(n=walker.nextNode()) nodes.push(n);
+    nodes.forEach(function(node){
+      var v=node.nodeValue, trimmed=v.trim();
+      if(dict[trimmed]) node.nodeValue = v.replace(trimmed, dict[trimmed]);
+    });
+    document.querySelectorAll('input[placeholder],textarea[placeholder]').forEach(function(el){
+      var ph=el.getAttribute('placeholder'); if(ph && dict[ph]) el.setAttribute('placeholder',dict[ph]);
+    });
+  }
+  var _origApply2 = window.applyI18nToDOM;
+  if(typeof _origApply2==='function'){
+    window.applyI18nToDOM = function(){
+      var r = _origApply2.apply(this,arguments);
+      try{ _translateTextNodes(); }catch(e){}
+      return r;
+    };
+  }
+  var _dynDeb=null;
+  function _scheduleDyn(){
+    if(_dynDeb) clearTimeout(_dynDeb);
+    _dynDeb=setTimeout(function(){ try{ _translateTextNodes(); }catch(e){} },400);
+  }
+  function _startObs(){
+    _scheduleDyn();
+    try{ new MutationObserver(_scheduleDyn).observe(document.body,{childList:true,subtree:true}); }catch(e){}
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',_startObs); else _startObs();
+
+  console.log('[APL+] ✓ Edição plantas/usuários + tradução dinâmica carregadas.');
+})();
+</script>
 
 </body>
 </html>
