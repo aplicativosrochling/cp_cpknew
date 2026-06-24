@@ -508,6 +508,26 @@ function initSupabaseClient() {
         // Expor FB e iniciar
         exposeFB();
 
+        // ── ADM: forçar landing no painel de plantas ANTES de _fbInit ──
+        try{
+          if (_currentProfile.role === 'admin') {
+            window.__aplPlantChosen = false;
+            var _pgAdm = document.getElementById('page-admin-plants');
+            if (_pgAdm) {
+              document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+              document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+              _pgAdm.classList.add('active');
+              _pgAdm.style.display = '';
+              if (typeof aplRenderGrid==='function')    try{ aplRenderGrid(); }catch(e){}
+              if (typeof aplLoadUsers==='function')     try{ aplLoadUsers();  }catch(e){}
+              if (typeof aplStartRealtime==='function') try{ aplStartRealtime();}catch(e){}
+              console.log('[SB] ✓ ADM landing em #page-admin-plants forçado.');
+            }
+          } else {
+            window.__aplPlantChosen = true;
+          }
+        }catch(e){ console.warn('[SB] ADM landing falhou', e); }
+
         // Disparar init se existir
         if (typeof window._fbInit === 'function') {
           console.log('[SB] 🚀 Chamando _fbInit()...');
@@ -3291,14 +3311,37 @@ const fIdx = v => f(v, Math.max(2, DEC)); // índices usam DEC (mín. 2)
    NAVIGATION
 ═══════════════════════════════════════════════ */
 function showPage(id, btn){
+  /* ── HOOK ADMIN LANDING: se ADM ainda não escolheu planta, segura em #page-admin-plants ── */
+  try{
+    var _isAdm = (window.currentProfile && window.currentProfile.role==='admin');
+    var _pgAdm = document.getElementById('page-admin-plants');
+    if(_isAdm && !window.__aplPlantChosen && id!=='admin-plants' && _pgAdm){
+      document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+      document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+      _pgAdm.classList.add('active');
+      _pgAdm.style.display='';
+      if(typeof aplRenderGrid==='function')   try{ aplRenderGrid(); }catch(e){}
+      if(typeof aplLoadUsers==='function')    try{ aplLoadUsers();  }catch(e){}
+      if(typeof aplStartRealtime==='function')try{ aplStartRealtime();}catch(e){}
+      if(typeof _setGT==='function' || typeof setGoogleLanguage==='function'){
+        try{ (window.setGoogleLanguage||function(){})((window.currentPlant&&window.currentPlant.language_code)||'pt-BR'); }catch(e){}
+      }
+      return;
+    }
+  }catch(e){}
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('page-'+id).classList.add('active');
+  var _el = document.getElementById('page-'+id);
+  if(_el) _el.classList.add('active');
   if(btn) btn.classList.add('active');
   if(id==='studies') renderStudiesList();
   if(id==='dashboard') renderDashboard();
   if(id==='admin' && typeof renderAdminPage==='function') renderAdminPage();
+  /* ── Re-aplica i18n + Google Translate em cada troca de página ── */
+  try{ if(typeof applyI18nToDOM==='function') applyI18nToDOM(); }catch(e){}
+  try{ if(typeof setGoogleLanguage==='function') setGoogleLanguage((window.currentPlant&&window.currentPlant.language_code)||window._currentLanguage||'pt-BR'); }catch(e){}
 }
+window.showPage = showPage;
 
 /* ═══════════════════════════════════════════════
    DASHBOARD
@@ -7396,6 +7439,33 @@ renderDashboard();
     try{ _setGT((window.currentPlant&&window.currentPlant.language_code)||langCode||'pt-BR'); }catch(e){}
     return r;
   };
+
+  /* ── Observer: retraduz tudo que aparecer dinamicamente (tabelas, modais, relatórios) ── */
+  var _gtDebounce=null;
+  function _retranslateAll(){
+    if(_gtDebounce) clearTimeout(_gtDebounce);
+    _gtDebounce=setTimeout(function(){
+      try{ if(typeof window.applyI18nToDOM==='function') window.applyI18nToDOM(); }catch(e){}
+      try{
+        var lang=(window.currentPlant&&window.currentPlant.language_code)||window._currentLanguage||'pt-BR';
+        _setGT(lang);
+      }catch(e){}
+    },350);
+  }
+  function _startDomObserver(){
+    if(window.__aplDomObserver) return;
+    try{
+      var mo=new MutationObserver(function(muts){
+        for(var i=0;i<muts.length;i++){
+          if(muts[i].addedNodes && muts[i].addedNodes.length){ _retranslateAll(); return; }
+        }
+      });
+      mo.observe(document.body,{childList:true,subtree:true});
+      window.__aplDomObserver=mo;
+      console.log('[GT] ✓ DOM observer ativo (tradução dinâmica).');
+    }catch(e){ console.warn('[GT] observer falhou',e); }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',_startDomObserver); else _startDomObserver();
 
   console.log('[APL] ✓ Painel ADM + tradução universal carregados.');
 })();
