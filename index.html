@@ -107,14 +107,28 @@ function initSupabaseClient() {
       // ── FALLBACK: se Supabase vazio, usa DYNTRAD local como i18nStrings ──
       if (!loaded || !i18nStrings || Object.keys(i18nStrings).length === 0) {
         console.warn('[i18n] ⚠️ Supabase sem traduções — usando dicionário local DYNTRAD');
-        // DYNTRAD é texto→texto; converte para formato chave→valor compatível
-        // O _adminApplyI18n (I18N dict) já cobre data-i18n, então marca como carregado
         var dynDict = (window._getDYNTRAD && window._getDYNTRAD(languageCode)) || {};
         if (Object.keys(dynDict).length > 0) {
-          // Popula i18nStrings com mapeamento direto para _forceTranslateEverything funcionar
           i18nStrings = dynDict;
           _currentLanguage = languageCode;
           console.log('[i18n] ✓ DYNTRAD carregado como fallback:', Object.keys(i18nStrings).length, 'strings');
+          // ── Aplica traduções imediatamente via _adminApplyI18n (data-i18n) ──
+          if (typeof window._adminApplyI18n === 'function') {
+            try { window._adminApplyI18n(languageCode); } catch(e) {}
+          }
+          // ── Aplica textos dinâmicos via _forceTranslateEverything ──
+          if (typeof window._forceTranslateEverything === 'function') {
+            try { window._forceTranslateEverything(); } catch(e) {}
+          }
+          // ── Dispara applyI18nToDOM com delay para pegar conteúdo renderizado ──
+          setTimeout(function() {
+            if (typeof window.applyI18nToDOM === 'function') try { window.applyI18nToDOM(); } catch(e) {}
+            if (typeof window._forceTranslateEverything === 'function') try { window._forceTranslateEverything(); } catch(e) {}
+          }, 150);
+          setTimeout(function() {
+            if (typeof window._forceTranslateEverything === 'function') try { window._forceTranslateEverything(); } catch(e) {}
+            if (typeof window._translateTextNodes === 'function') try { window._translateTextNodes(); } catch(e) {}
+          }, 400);
         }
       }
 
@@ -8580,6 +8594,7 @@ renderDashboard();
       'Nenhum estudo encontrado':'Ningún estudio encontrado',
       'Atualizado:':'Actualizado:'
     },
+    'de-DE':{
       'Carregando…':'Lädt…','Salvando…':'Speichert…','Criando…':'Erstellt…',
       'Nenhuma planta cadastrada.':'Keine Werke registriert.',
       'Acessar Planta':'Werk öffnen','Editar':'Bearbeiten','Salvar':'Speichern','Cancelar':'Abbrechen','Excluir':'Löschen',
@@ -8713,6 +8728,7 @@ renderDashboard();
       'Nenhum estudo encontrado':'Keine Studie gefunden',
       'Atualizado:':'Aktualisiert:'
     },
+    'it-IT':{
       'Carregando…':'Caricamento…','Carregando...':'Caricamento...','Salvando…':'Salvataggio…','Criando…':'Creazione…',
       'Nenhuma planta cadastrada.':'Nessun impianto registrato.',
       'Acessar Planta':'Accedi all\'Impianto','Editar':'Modifica','Salvar':'Salva','Cancelar':'Annulla','Excluir':'Elimina',
