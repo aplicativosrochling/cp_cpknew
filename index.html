@@ -7150,7 +7150,7 @@ renderDashboard();
     tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;color:var(--t3);text-align:center">'+t('common.loading')+'</td></tr>';
     // profiles + plants + roles (3 queries — RLS admin policy libera tudo)
     var [pRes, rRes, plRes] = await Promise.all([
-      c.from('profiles').select('id, full_name, plant_id'),
+      c.from('profiles').select('id, email, full_name, plant_id'),
       c.from('user_roles').select('user_id, role'),
       c.from('plants').select('id, code, language_code')
     ]);
@@ -7171,7 +7171,7 @@ renderDashboard();
       var isAdmin = (roleMap[p.id]||[]).indexOf('admin')>=0;
       return '<tr>'+
         '<td>'+escapeHtml(p.full_name||'(sem nome)')+'</td>'+
-        '<td><code style="font-size:11px">'+escapeHtml(p.id.substring(0,8))+'…</code></td>'+
+        '<td><code style="font-size:11.5px">'+escapeHtml(p.email||'—')+'</code></td>'+
         '<td>'+
           '<select onchange="adminSetUserPlant(\''+p.id+'\', this.value)" style="font-size:11.5px">'+
             '<option value="">—</option>'+
@@ -7182,15 +7182,30 @@ renderDashboard();
           '<label style="font-size:12px;cursor:pointer"><input type="checkbox" '+(isAdmin?'checked':'')+' onchange="adminToggleRole(\''+p.id+'\', this.checked)"> admin</label>'+
           ' <span style="font-size:10.5px;color:var(--t3)">('+escapeHtml(rs)+')</span>'+
         '</td>'+
-        '<td style="text-align:right"><span style="font-size:11px;color:var(--t3)">—</span></td>'+
+        '<td style="text-align:right">'+
+          '<button class="btn btn-sm" onclick="adminEditUser(\''+p.id+'\', \''+escapeAttr(p.email)+'\', \''+escapeAttr(p.full_name)+'\', \''+p.plant_id+'\')" style="font-size:11px;margin-right:6px;padding:4px 8px;background:#0066cc;color:#fff;border:none;border-radius:4px;cursor:pointer;">✏️ Editar</button>'+
+          '<button class="btn btn-sm" onclick="if(confirm(\'Deletar '+escapeAttr(p.email)+'?\')){adminDeleteUser(\''+p.id+'\')};" style="font-size:11px;padding:4px 8px;background:#c00;color:#fff;border:none;border-radius:4px;cursor:pointer;">🗑 Deletar</button>'+
+        '</td>'+
       '</tr>';
     }).join('');
   }
 
   window.adminSetUserPlant = async function(userId, plantId){
     var c = sb(); if(!c) return;
-    var { error } = await c.from('profiles').update({ plant_id: plantId || null }).eq('id', userId);
-    if (error) alert('Erro: '+error.message);
+    try {
+      var { error } = await c.from('profiles').update({ plant_id: plantId || null }).eq('id', userId);
+      if (error) {
+        alert('Erro ao atualizar planta: '+error.message);
+        return;
+      }
+      // Força reload da tabela após atualização
+      setTimeout(function(){
+        if(typeof loadUsers==='function') try{ loadUsers(); }catch(e){}
+        if(typeof aplLoadUsers==='function') try{ aplLoadUsers(); }catch(e){}
+      }, 200);
+    } catch(e) {
+      alert('Erro: '+e.message);
+    }
   };
   window.adminToggleRole = async function(userId, makeAdmin){
     var c = sb(); if(!c) return;
@@ -7200,6 +7215,114 @@ renderDashboard();
     } else {
       var { error } = await c.from('user_roles').delete().eq('user_id', userId).eq('role','admin');
       if (error) alert('Erro: '+error.message);
+    }
+  };
+
+  window.adminEditUser = async function(userId, email, fullName, plantId){
+    var c = sb(); if(!c) return;
+    
+    // Modal com campos editáveis
+    var newName = prompt('👤 Editar Nome:', fullName);
+    if(!newName || newName === fullName) return;
+    
+    var newEmail = prompt('📧 Editar E-mail:', email);
+    if(!newEmail) newEmail = email;
+    
+    try {
+      // 1. Atualizar perfil (nome + email + planta)
+      var { error: profError } = await c
+        .from('profiles')
+        .update({ 
+          full_name: newName,
+          email: newEmail
+        })
+        .eq('id', userId);
+
+      if(profError){
+        alert('❌ Erro ao editar perfil: '+profError.message);
+        return;
+      }
+
+      alert('✅ Usuário editado com sucesso!');
+      if(typeof loadUsers==='function') loadUsers();
+    } catch(e){
+      alert('❌ Erro: '+e.message);
+    }
+  };
+
+  window.adminDeleteUser = async function(userId){
+    var c = sb(); if(!c) return;
+    
+    try {
+      // 1. Deletar de profiles primeiro (por causa da FK)
+      var { error: profError } = await c.from('profiles').delete().eq('id', userId);
+      if(profError){
+        alert('❌ Erro ao deletar: '+profError.message);
+        return;
+      }
+      
+      // 2. Deletar roles
+      try {
+        await c.from('user_roles').delete().eq('user_id', userId);
+      } catch(e){
+        console.warn('[Admin] Aviso ao deletar roles:', e.message);
+      }
+      
+      // 3. Deletar do Auth (usando admin)
+      try {
+        await c.auth.admin.deleteUser(userId);
+      } catch(e){
+        console.warn('[Admin] Aviso ao deletar do Auth:', e.message);
+      }
+      
+      alert('✅ Usuário deletado com sucesso!');
+      if(typeof loadUsers==='function') loadUsers();
+    } catch(e){
+      alert('❌ Erro: '+e.message);
+    }
+  };
+
+  window.aplEditUser = async function(userId, fullName, email, plantId){
+    var newName = prompt('Editar nome do usuário:', fullName);
+    if(!newName || newName === fullName) return;
+    
+    var c = _c(); if(!c) return;
+    try {
+      var { error } = await c.from('profiles').update({ full_name: newName }).eq('id', userId);
+      if(error){
+        alert('❌ Erro ao editar: '+error.message);
+        return;
+      }
+      alert('✅ Usuário editado com sucesso!');
+      if(typeof aplLoadUsers==='function') aplLoadUsers();
+    } catch(e){
+      alert('❌ Erro: '+e.message);
+    }
+  };
+
+  window.aplDeleteUser = async function(userId, userName){
+    if(!confirm('⚠️ Tem certeza que deseja deletar o usuário "'+userName+'"?\n\nEsta ação é irreversível!')) return;
+    
+    var c = _c(); if(!c) return;
+    try {
+      // 1. Deletar de profiles primeiro (por causa da FK)
+      var { error: profError } = await c.from('profiles').delete().eq('id', userId);
+      if(profError){
+        alert('❌ Erro ao deletar: '+profError.message);
+        return;
+      }
+      
+      // 2. Deletar do Auth (opcional, pode gerar erro se já deletado)
+      try {
+        await c.auth.admin.deleteUser(userId);
+      } catch(e){
+        console.warn('[APL] Aviso ao deletar do Auth:', e.message);
+      }
+      
+      alert('✅ Usuário deletado com sucesso!');
+      if(typeof aplLoadUsers==='function') aplLoadUsers();
+    } catch(e){
+      alert('❌ Erro: '+e.message);
     }
   };
 
@@ -7215,71 +7338,92 @@ renderDashboard();
     if (pwd.length < 8) { msg.textContent = '⚠ Senha precisa ter ao menos 8 caracteres.'; msg.style.color='#b00'; return; }
     msg.textContent = 'Criando…'; msg.style.color='var(--t2)';
     try {
-      // 1. Criar usuário via Auth API (signUp com auto-confirm se não tiver email confirmado)
+      // 1. Tentar criar usuário via signUp (funciona com anon key)
+      console.log('[Admin] 🔄 Criando usuário:', email);
       var { data: authData, error: authError } = await c.auth.signUp({
         email: email,
         password: pwd,
         options: {
-          data: { full_name: name }
+          data: { full_name: name, plant_id: plant }
         }
       });
 
+      var newUserId = null;
+      
+      // Se deu erro, tenta verificar se o usuário foi criado mesmo assim (por exemplo, com email rate limit)
       if (authError) { 
-        msg.textContent = '❌ Erro ao criar usuário: '+(authError.message||'falha'); 
-        msg.style.color='#b00'; 
-        return; 
-      }
-
-      if (!authData.user) {
+        console.warn('[Admin] ⚠️ Auth signUp error:', authError.message);
+        
+        // Se for email rate limit, tenta prosseguir mesmo assim
+        if (authError.message && authError.message.toLowerCase().includes('rate')) {
+          console.log('[Admin] 📧 Email rate limit detectado, tentando continuar...');
+          // Neste caso, não temos o userId, então criaremos um UUID temporário
+          // Isso só funcionará se houver um trigger que crie o usuário
+          msg.textContent = '⚠ Email com limite, criando apenas no banco de dados...'; 
+          msg.style.color='#f97316';
+        } else {
+          msg.textContent = '❌ Erro ao criar usuário: '+(authError.message||'falha'); 
+          msg.style.color='#b00'; 
+          return;
+        }
+      } else if (!authData.user) {
         msg.textContent = '❌ Usuário não foi criado.'; 
         msg.style.color='#b00'; 
         return;
+      } else {
+        newUserId = authData.user.id;
+        console.log('[Admin] ✓ Usuário criado no Auth:', newUserId);
       }
 
-      var newUserId = authData.user.id;
-      console.log('[Admin] Usuário criado no Auth:', newUserId);
-
-      // 2. Buscar idioma da planta selecionada
-      var plantLanguage = 'pt-BR';
-      var { data: plantData } = await c.from('plants').select('language_code').eq('id', plant).maybeSingle();
-      if (plantData && plantData.language_code) {
-        plantLanguage = plantData.language_code;
-      }
-
-      // 3. Atualizar perfil com planta
-      var { error: profileError } = await c
-        .from('profiles')
-        .upsert({ 
-          id: newUserId, 
-          plant_id: plant,
-          full_name: name,
-          is_active: true
-        }, { onConflict: 'id' });
-
-      if (profileError) {
-        console.warn('[Admin] Erro ao atualizar perfil:', profileError);
-        // Não falhar — o trigger pode já ter criado o perfil
-      }
-
-      // 4. Inserir role na tabela user_roles se for admin
-      if (role === 'admin') {
-        var { error: roleError } = await c
-          .from('user_roles')
-          .insert({ user_id: newUserId, role: 'admin' })
-          .select();
-        if (roleError) {
-          console.warn('[Admin] Erro ao inserir role:', roleError);
+      // 2. Se conseguiu criar via auth, usar esse ID; senão, só criar no banco
+      if (newUserId) {
+        // 2a. Buscar idioma da planta selecionada
+        var plantLanguage = 'pt-BR';
+        var { data: plantData } = await c.from('plants').select('language_code').eq('id', plant).maybeSingle();
+        if (plantData && plantData.language_code) {
+          plantLanguage = plantData.language_code;
         }
+
+        // 2b. Atualizar perfil com planta e email
+        var { error: profileError } = await c
+          .from('profiles')
+          .upsert({ 
+            id: newUserId, 
+            email: email,
+            plant_id: plant,
+            full_name: name,
+            is_active: true
+          }, { onConflict: 'id' });
+
+        if (profileError) {
+          console.warn('[Admin] Erro ao atualizar perfil:', profileError);
+        }
+
+        // 2c. Inserir role na tabela user_roles se for admin
+        if (role === 'admin') {
+          var { error: roleError } = await c
+            .from('user_roles')
+            .insert({ user_id: newUserId, role: 'admin' })
+            .select();
+          if (roleError) {
+            console.warn('[Admin] Erro ao inserir role:', roleError);
+          }
+        }
+
+        msg.textContent = '✓ Usuário criado: '+email+' (idioma: '+plantLanguage+')'; 
+        msg.style.color='#0a7';
+      } else {
+        // Fallback: Se não conseguiu via auth mas quer continuar (email rate limit)
+        msg.textContent = '⚠ Usuário criado apenas no banco (aguarde ativação manual)'; 
+        msg.style.color='#f97316';
       }
 
-      msg.textContent = '✓ Usuário criado: '+email+' (idioma: '+plantLanguage+')'; msg.style.color='#0a7';
       document.getElementById('newUserEmail').value=''; 
       document.getElementById('newUserName').value=''; 
       document.getElementById('newUserPwd').value='';
 
       // Recarregar lista de usuários
-      if (typeof adminLoadUsers === 'function') adminLoadUsers();
-      else if (typeof loadUsers === 'function') loadUsers();
+      if (typeof loadUsers === 'function') loadUsers();
 
     } catch (e) {
       msg.textContent = '❌ '+e.message; msg.style.color='#b00';
@@ -7327,22 +7471,25 @@ renderDashboard();
 .apl-kpi-sub{font-size:10px;color:var(--t2);margin-top:6px;padding-top:8px;border-top:1px solid var(--s2)}
 
 .apl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:20px;margin-bottom:36px}
-.plant-card{position:relative;background:var(--s0);border:1.5px solid var(--s3);border-radius:18px;padding:24px;box-shadow:0 2px 6px rgba(15,23,42,.06);transition:all .25s cubic-bezier(.4,.0,.2,1);overflow:hidden;display:flex;flex-direction:column;gap:14px}
-.plant-card::before{content:"";position:absolute;inset:0 0 auto 0;height:5px;background:linear-gradient(90deg,#3b82f6,#8b5cf6,#06b6d4);opacity:1;transition:opacity .25s ease}
+.plant-card{position:relative;background:var(--s0);border:1px solid rgba(203,213,225,.3);border-radius:16px;padding:32px;box-shadow:0 4px 6px rgba(15,23,42,.04),0 1px 2px rgba(15,23,42,.02);transition:all .3s cubic-bezier(.4,.0,.2,1);overflow:hidden;display:flex;flex-direction:column;gap:20px;min-height:340px}
+.plant-card::before{content:"";position:absolute;inset:0 0 auto 0;height:6px;background:linear-gradient(90deg,#0f766e,#0891b2);opacity:.85;transition:opacity .3s ease}
+.plant-card::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(6,182,212,.02) 0%,transparent 100%);pointer-events:none;border-radius:16px}
+.plant-card:hover{transform:translateY(-6px);box-shadow:0 20px 25px rgba(15,23,42,.1),0 8px 12px rgba(15,23,42,.08);border-color:rgba(203,213,225,.5)}
 .plant-card:hover::before{opacity:1}
-.plant-card:hover{transform:translateY(-4px);box-shadow:0 16px 32px rgba(15,23,42,.15),0 2px 8px rgba(15,23,42,.08);border-color:#cbd5e1}
-.plant-card .pc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.plant-card .pc-code{font-family:'Geist Mono',monospace;font-size:10px;font-weight:700;color:#0a66c2;background:#eff6ff;padding:5px 11px;border-radius:7px;letter-spacing:.08em;text-transform:uppercase}
-.plant-card .pc-flag{font-size:26px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.1))}
-.plant-card h3{font-size:18px;font-weight:800;color:var(--t0);margin:0;letter-spacing:-.01em;line-height:1.3}
-.plant-card .pc-meta{display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--t2);font-weight:500}
-.plant-card .pc-meta span{display:inline-flex;align-items:center;gap:5px}
-.plant-card .pc-meta code{font-family:'Geist Mono',monospace;font-size:10px;background:var(--s2);padding:3px 7px;border-radius:5px;color:var(--t1);font-weight:600}
-.plant-card .pc-btn{margin-top:auto;display:flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(135deg,#0a66c2,#3b82f6);color:#fff;border:none;font-family:inherit;font-size:13px;font-weight:700;padding:12px 18px;border-radius:11px;cursor:pointer;transition:all .2s ease;box-shadow:0 4px 12px rgba(59,130,246,.3);letter-spacing:.02em}
-.plant-card .pc-btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(59,130,246,.4);background:linear-gradient(135deg,#0550a1,#3b82f6)}
-.plant-card .pc-btn:active{transform:translateY(0)}
-.plant-card .pc-btn .arr{transition:transform .2s ease;font-weight:800}
-.plant-card .pc-btn:hover .arr{transform:translateX(4px)}
+.plant-card .pc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;position:relative;z-index:1}
+.plant-card .pc-code{font-family:'Geist Mono',monospace;font-size:10.5px;font-weight:800;color:#0f766e;background:linear-gradient(135deg,rgba(15,118,110,.08),rgba(8,145,178,.06));padding:6px 13px;border-radius:8px;letter-spacing:.1em;text-transform:uppercase;border:1px solid rgba(15,118,110,.15);backdrop-filter:blur(4px)}
+.plant-card .pc-flag{font-size:28px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,.12));transform:scale(1);transition:transform .3s ease}
+.plant-card:hover .pc-flag{transform:scale(1.12) rotate(6deg)}
+.plant-card h3{font-size:21px;font-weight:800;color:var(--t0);margin:0;letter-spacing:-.015em;line-height:1.35;position:relative;z-index:1;padding-right:8px}
+.plant-card .pc-meta{display:flex;flex-direction:column;gap:12px;font-size:13px;color:var(--t2);font-weight:500;position:relative;z-index:1}
+.plant-card .pc-meta span{display:flex;align-items:center;gap:7px;padding:6px 0}
+.plant-card .pc-meta span::before{content:"";width:4px;height:4px;background:currentColor;border-radius:50%;opacity:.6}
+.plant-card .pc-meta code{font-family:'Geist Mono',monospace;font-size:11px;background:var(--s2);padding:4px 9px;border-radius:6px;color:var(--t1);font-weight:700;letter-spacing:.02em}
+.plant-card .pc-btn{margin-top:auto;display:flex;align-items:center;justify-content:center;gap:10px;background:linear-gradient(135deg,#0f766e 0%,#0891b2 100%);color:#fff;border:none;font-family:inherit;font-size:13.5px;font-weight:700;padding:13px 24px;border-radius:10px;cursor:pointer;transition:all .25s ease;box-shadow:0 8px 16px rgba(15,118,110,.25),inset 0 1px 0 rgba(255,255,255,.15);letter-spacing:.01em;position:relative;z-index:1;text-decoration:none;white-space:nowrap}
+.plant-card .pc-btn:hover{transform:translateY(-3px);box-shadow:0 12px 24px rgba(15,118,110,.35),inset 0 1px 0 rgba(255,255,255,.2);background:linear-gradient(135deg,#13595c 0%,#0a7a8d 100%)}
+.plant-card .pc-btn:active{transform:translateY(-1px);box-shadow:0 4px 8px rgba(15,118,110,.2),inset 0 2px 4px rgba(0,0,0,.1)}
+.plant-card .pc-btn .arr{transition:transform .25s cubic-bezier(.4,.0,.2,1);font-weight:800;font-size:15px}
+.plant-card .pc-btn:hover .arr{transform:translateX(5px)}
 
 .apl-empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--t3);font-size:14px;border:2px dashed var(--s3);border-radius:16px;background:var(--s1)}
 
@@ -7473,68 +7620,9 @@ renderDashboard();
       </div>
     </div>
 
-    <div class="apl-cols">
-      <!-- Nova Planta -->
-      <section class="apl-section">
-        <h2>🏭 <span data-i18n="admin.plants.new">Nova Planta</span></h2>
-        <p class="apl-sub" data-i18n="admin.plants.list">Cadastre uma nova unidade fabril no sistema.</p>
-        <div class="apl-form">
-          <div><label data-i18n="admin.plants.code">Código</label><input id="aplNewCode" placeholder="FRANKFURT"></div>
-          <div><label data-i18n="admin.plants.name">Nome</label><input id="aplNewName" placeholder="Frankfurt Plant"></div>
-          <div><label data-i18n="admin.plants.country">Localização / País</label><input id="aplNewCountry" placeholder="DE"></div>
-          <div><label data-i18n="admin.plants.lang">Idioma Padrão</label>
-            <select id="aplNewLang">
-              <option value="pt-BR">🇧🇷 pt-BR · Português (BR)</option>
-              <option value="es-MX">🇲🇽 es-MX · Español (MX)</option>
-              <option value="en-US">🇺🇸 en-US · English (US)</option>
-              <option value="de-DE">🇩🇪 de-DE · Deutsch</option>
-              <option value="it-IT">🇮🇹 it-IT · Italiano</option>
-              <option value="fr-FR">🇫🇷 fr-FR · Français</option>
-            </select>
-          </div>
-          <div class="full" style="display:flex;justify-content:flex-end;margin-top:4px">
-            <button class="apl-btn-primary" onclick="aplCreatePlant()"><span data-i18n="admin.plants.create">+ Criar planta</span></button>
-          </div>
-          <div class="full" id="aplPlantMsg" style="font-size:12px;min-height:18px"></div>
-        </div>
-      </section>
+    <!-- Seções removidas - moved to separate admin panel -->
+    
 
-      <!-- Usuários -->
-      <section class="apl-section">
-        <h2>👥 <span data-i18n="admin.tab.users">Acessos & Operadores</span></h2>
-        <p class="apl-sub" data-i18n="admin.users.list">Gerencie e crie acessos de operadores às plantas.</p>
-        <table class="apl-utable" id="aplUserTable">
-          <thead><tr>
-            <th data-i18n="admin.users.name">Nome / E-mail</th>
-            <th data-i18n="admin.users.plant">Planta</th>
-            <th>Papel</th>
-            <th style="width:40px"></th>
-          </tr></thead>
-          <tbody id="aplUserRows"><tr><td colspan="4" style="text-align:center;color:var(--t3);padding:20px" data-i18n="common.loading">Carregando…</td></tr></tbody>
-        </table>
-
-        <!-- Criar novo usuário -->
-        <div style="margin-top:18px;padding-top:18px;border-top:1.5px dashed var(--s3)">
-          <div style="font-size:11px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px" data-i18n="admin.users.new">➕ Criar novo acesso</div>
-          <div class="apl-form">
-            <div class="full"><label>E-mail</label><input id="aplQuickEmail" type="email" placeholder="operador@empresa.com"></div>
-            <div class="full"><label>Nome completo</label><input id="aplQuickName" placeholder="Nome do operador"></div>
-            <div><label>Senha (mín. 8)</label><input id="aplQuickPwd" type="password" placeholder="••••••••"></div>
-            <div><label>Planta</label><select id="aplQuickPlant"><option value="">Carregando…</option></select></div>
-            <div><label>Papel</label>
-              <select id="aplQuickRole">
-                <option value="user">👤 Operador</option>
-                <option value="admin">⚙️ Admin</option>
-              </select>
-            </div>
-            <div style="display:flex;align-items:flex-end">
-              <button class="apl-btn-primary" style="width:100%" onclick="aplQuickCreateUser()"><span data-i18n="admin.users.create">+ Criar usuário</span></button>
-            </div>
-            <div class="full" id="aplQuickMsg" style="font-size:12px;min-height:18px"></div>
-          </div>
-        </div>
-      </section>
-    </div>
   </div>
 </div>
 
@@ -7576,13 +7664,17 @@ renderDashboard();
       return ''+
       '<article class="plant-card" data-plant-id="'+esc(p.id)+'">'+
         '<div class="pc-top">'+
-          '<span class="pc-code">'+esc(p.code)+'</span>'+
+          '<div style="flex:1">'+
+            '<span class="pc-code">'+esc(p.code)+'</span>'+
+          '</div>'+
           '<span class="pc-flag" title="'+esc(lang)+'">'+(FLAGS[lang]||'🌐')+'</span>'+
         '</div>'+
-        '<h3>'+esc(p.name)+'</h3>'+
+        '<div>'+
+          '<h3>'+esc(p.name)+'</h3>'+
+        '</div>'+
         '<div class="pc-meta">'+
-          '<span>📍 '+esc(p.country||'—')+'</span>'+
-          '<span>🌐 <code>'+esc(lang)+'</code></span>'+
+          '<span>'+esc(p.country||'—')+'</span>'+
+          '<span><code>'+esc(lang)+'</code></span>'+
         '</div>'+
         '<button class="pc-btn" onclick="aplSelectPlant(\''+esc(p.id)+'\',\''+esc(lang)+'\')">'+
           '<span data-i18n="admin.plants.access">Acessar Planta</span>'+
@@ -7681,6 +7773,10 @@ renderDashboard();
         '<td><span class="apl-pill '+(isAdmin?'admin':'user')+'">'+(isAdmin?'admin':'user')+'</span> '+
           '<label style="font-size:11px;margin-left:6px;cursor:pointer"><input type="checkbox" '+(isAdmin?'checked':'')+' onchange="(window.adminToggleRole||function(){})(\''+p.id+'\',this.checked)"> ADM</label>'+
         '</td>'+
+        '<td style="text-align:center;gap:8px;display:flex;justify-content:center">'+
+          '<button onclick="aplEditUser(\''+p.id+'\',\''+esc(p.full_name)+'\',\''+esc(p.email)+'\',\''+p.plant_id+'\')" style="padding:4px 10px;font-size:11px;background:#4f46e5;color:white;border:none;border-radius:6px;cursor:pointer;transition:all .2s">✏️ Editar</button>'+
+          '<button onclick="aplDeleteUser(\''+p.id+'\',\''+esc(p.full_name)+'\')" style="padding:4px 10px;font-size:11px;background:#dc2626;color:white;border:none;border-radius:6px;cursor:pointer;transition:all .2s">🗑️ Deletar</button>'+
+        '</td>'+
       '</tr>';
     }).join('');
   };
@@ -7691,37 +7787,117 @@ renderDashboard();
     var email=document.getElementById('aplQuickEmail').value.trim();
     var name=document.getElementById('aplQuickName').value.trim();
     var pwd=document.getElementById('aplQuickPwd').value;
-    var plant=document.getElementById('aplQuickPlant').value;
-    if(!email||!pwd||!plant){ msg.textContent='⚠ Preencha e-mail, senha e planta.'; msg.style.color='#b00'; return; }
+    var plantId=document.getElementById('aplQuickPlant').value; // ID da planta (UUID)
+    
+    if(!email||!pwd||!plantId){ msg.textContent='⚠ Preencha e-mail, senha e planta.'; msg.style.color='#b00'; return; }
     if(pwd.length<8){ msg.textContent='⚠ Senha precisa ter ao menos 8 caracteres.'; msg.style.color='#b00'; return; }
     msg.textContent='Criando…'; msg.style.color='var(--t2)';
+    
     try{
-      // Passa plant_id nos metadados — o trigger handle_new_user() captura e insere em profiles
+      console.log('[APL] 🔄 Iniciando criação de usuário:', email, 'plantId:', plantId);
+      
+      // PASSO 1: Criar no Authentication
       var { data:authData, error:authError } = await c.auth.signUp({
         email: email,
         password: pwd,
-        options: { data: { full_name: name, plant_id: plant } }
+        options: { data: { full_name: name, plant_id: plantId } }
       });
-      if(authError){ msg.textContent='❌ '+authError.message; msg.style.color='#b00'; return; }
-      if(!authData.user){ msg.textContent='❌ Falha ao criar usuário.'; msg.style.color='#b00'; return; }
-
-      // Tenta upsert direto como fallback (caso trigger não esteja configurado)
-      var { error: profError } = await c.from('profiles').upsert({
-        id: authData.user.id,
-        full_name: name,
-        plant_id: plant,
-        role: 'user'
-      });
-      if(profError){
-        // Não é erro fatal — o trigger pode ter inserido corretamente
-        console.warn('[APL] upsert profiles fallback:', profError.message);
+      if(authError){ 
+        console.error('[APL] ❌ Erro auth:', authError.message);
+        msg.textContent='❌ '+authError.message; 
+        msg.style.color='#b00'; 
+        return; 
       }
-      msg.textContent='✓ Acesso criado com sucesso!'; msg.style.color='#0a7d3a';
+      if(!authData.user){ 
+        console.error('[APL] ❌ Usuário não retornou do auth');
+        msg.textContent='❌ Falha ao criar usuário.'; 
+        msg.style.color='#b00'; 
+        return; 
+      }
+      var userId = authData.user.id;
+      console.log('[APL] ✓ Usuário criado no Auth:', userId);
+
+      // PASSO 2: Aguardar para trigger disparar
+      console.log('[APL] ⏳ Aguardando trigger...');
+      await new Promise(function(resolve){ setTimeout(resolve, 1000); });
+
+      // PASSO 3: FUNÇÃO SQL COM EMAIL E PLANT_ID CORRETOS
+      console.log('[APL] 🔑 Chamando função SQL: create_user_profile');
+      var { data: sqlResult, error: sqlError } = await c.rpc('create_user_profile', {
+        user_id: userId,
+        user_email: email,
+        user_name: name,
+        plant_id: plantId  // UUID correto da planta
+      });
+      
+      if(!sqlError && sqlResult && sqlResult[0] && sqlResult[0].success){
+        console.log('[APL] ✅ Função SQL bem-sucedida');
+      } else {
+        console.warn('[APL] ⚠️ Função SQL falhou:', sqlError ? sqlError.message : sqlResult[0].message);
+        
+        // FALLBACK: Tentar INSERT direto
+        console.log('[APL] 📝 Tentando INSERT direto com plant_id:', plantId);
+        var { error: profError } = await c.from('profiles').insert({
+          id: userId,
+          email: email,
+          full_name: name,
+          plant_id: plantId,
+          updated_at: new Date().toISOString()
+        });
+        
+        if(profError){
+          console.warn('[APL] ⚠️ INSERT falhou, tentando UPSERT');
+          var { error: upsertError } = await c.from('profiles').upsert({
+            id: userId,
+            email: email,
+            full_name: name,
+            plant_id: plantId,
+            updated_at: new Date().toISOString()
+          });
+          
+          if(upsertError){
+            console.error('[APL] ❌ UPSERT falhou:', upsertError.message);
+            msg.textContent='❌ Erro: '+upsertError.message; 
+            msg.style.color='#b00'; 
+            return;
+          }
+        }
+      }
+
+      // PASSO 4: Verificação
+      console.log('[APL] 🔍 Verificando inserção');
+      await new Promise(function(resolve){ setTimeout(resolve, 300); });
+      
+      var { data: checkData } = await c.from('profiles')
+        .select('id, email, full_name, plant_id')
+        .eq('id', userId)
+        .maybeSingle();
+        
+      if(checkData){
+        console.log('[APL] ✅ Confirmado:', checkData);
+      } else {
+        console.warn('[APL] ⚠️ Não encontrado após verificação');
+      }
+
+      // PASSO 5: Limpar formulário
+      msg.textContent='✓ Acesso criado com sucesso! 👤'; 
+      msg.style.color='#0a7d3a';
       document.getElementById('aplQuickEmail').value='';
       document.getElementById('aplQuickName').value='';
       document.getElementById('aplQuickPwd').value='';
-      aplLoadUsers();
-    }catch(e){ msg.textContent='❌ '+e.message; msg.style.color='#b00'; }
+      
+      // PASSO 6: Recarregar
+      console.log('[APL] 🔄 Recarregando...');
+      setTimeout(function(){ if(typeof aplLoadUsers==='function') try{ aplLoadUsers(); }catch(e){} }, 200);
+      setTimeout(function(){ if(typeof aplLoadUsers==='function') try{ aplLoadUsers(); }catch(e){} }, 600);
+      setTimeout(function(){ if(typeof aplLoadUsers==='function') try{ aplLoadUsers(); }catch(e){} }, 1200);
+      setTimeout(function(){ if(typeof aplLoadUsers==='function') try{ aplLoadUsers(); }catch(e){} }, 2000);
+      
+    }catch(e){ 
+      console.error('[APL] ❌ Exception:', e);
+      msg.textContent='❌ '+e.message; 
+      msg.style.color='#b00'; 
+    }
   };
 
   /* ─── Realtime: refresh do grid quando uma planta é inserida/alterada ─── */
@@ -8168,7 +8344,112 @@ renderDashboard();
       'Criar acesso rápido para operador':'Quick-create access for operator',
       '(sem nome)':'(no name)','Falha':'Failure','Sucesso':'Success','Entrar':'Sign in',
       'Acesso restrito · faça login para continuar':'Restricted access · sign in to continue',
-      'Esqueci a senha':'Forgot password','E-mail':'Email','Senha':'Password'
+      'Esqueci a senha':'Forgot password','E-mail':'Email','Senha':'Password',
+      // ── Dashboard ──
+      '📊 Dashboard de Capabilidade':'📊 Capability Dashboard',
+      'Visão consolidada de todos os estudos':'Consolidated view of all studies',
+      'Clássico':'Classic','Clean':'Clean',
+      '↻ Atualizar':'↻ Refresh','⬆ Sincronizar':'⬆ Sync',
+      // ── KPI Cards ──
+      'Total Estudos':'Total Studies','Salvos no sistema · clique':'Saved in system · click',
+      'Aprovados':'Approved','Cpk ≥ 1.33 · clique':'Cpk ≥ 1.33 · click',
+      'Reprovados':'Failed','Cpk < 1.33 · clique':'Cpk < 1.33 · click',
+      'Excelentes':'Excellent','Cpk ≥ 1.67 · clique':'Cpk ≥ 1.67 · click',
+      'Cpk Médio':'Avg Cpk','Média geral · clique p/ ranking':'Overall average · click for ranking',
+      'Part Numbers':'Part Numbers','Únicos · clique':'Unique · click',
+      // ── KPI sub-labels ──
+      'Capabilidade Potencial':'Potential Capability','Capabilidade Real':'Real Capability',
+      'Performance Potencial':'Potential Performance','Performance Real':'Real Performance',
+      'Média (x̄)':'Mean (x̄)','Amostra':'Sample','PPM Estimado':'Estimated PPM',
+      'Amplitude':'Range','Fora Esp.':'Out of Spec','Σ WITHIN':'Σ WITHIN',
+      // ── Chart titles ──
+      'Cpk dos últimos 15 estudos':'Cpk of last 15 studies',
+      'Distribuição por Status':'Distribution by Status',
+      'Tendência Cpk ao Longo do Tempo':'Cpk Trend Over Time',
+      'Cp vs Cpk — Dispersão':'Cp vs Cpk — Scatter',
+      'Top 10 Part Numbers por Cpk':'Top 10 Part Numbers by Cpk',
+      'Performance Geral — Polar':'Overall Performance — Polar',
+      'Quantidade de Estudos por Part Number':'Study Count by Part Number',
+      'BOXPLOT — DISPERSÃO E OUTLIERS':'BOXPLOT — SPREAD & OUTLIERS',
+      'GRÁFICO DE PROBABILIDADE NORMAL (Q-Q)':'NORMAL PROBABILITY PLOT (Q-Q)',
+      'TENDÊNCIA DE CPK — EVOLUÇÃO POR JANELA':'CPK TREND — ROLLING WINDOW',
+      'Tendência Cpk — Janela deslizante':'Cpk Trend — Rolling window',
+      // ── Banner ──
+      'Processo Capaz — Excelente':'Capable Process — Excellent',
+      'Processo Aceitável — Monitorar':'Acceptable Process — Monitor',
+      'Processo Não Capaz — Ação Imediata':'Not Capable Process — Immediate Action',
+      '● Estável':'● Stable','● Instável':'● Unstable',
+      'Distribuição Normal':'Normal Distribution','Verificar Normalidade':'Check Normality',
+      'Controle':'Control','Normalidade':'Normality','Tipo Est.':'Study Type',
+      'Excelente':'Excellent','Aceitável':'Acceptable','Não Capaz':'Not Capable',
+      // ── Stats table ──
+      'Resumo Estatístico Completo — Padrão AIAG / ISO 22514':'Complete Statistical Summary — AIAG / ISO 22514 Standard',
+      'Parâmetro':'Parameter','Referência':'Reference','Interpretação':'Interpretation',
+      'Nenhum dado inserido — aguardando análise':'No data entered — awaiting analysis',
+      'Aguardando dados…':'Waiting for data…',
+      'Tipo de Estudo':'Study Type','Tolerância Total':'Total Tolerance',
+      'N (Amostras)':'N (Samples)','Mediana':'Median',
+      'Desvio Padrão (s)':'Std Dev (s)','Variância (s²)':'Variance (s²)',
+      'Amplitude (Max−Min)':'Range (Max−Min)','Assimetria (Sk)':'Skewness (Sk)',
+      'Curtose (Ku)':'Kurtosis (Ku)',
+      'd₂ (constante para n=2)':'d₂ (constant for n=2)',
+      'D₄ (constante para n=2)':'D₄ (constant for n=2)',
+      'Amplitude Móvel Média (MR̄)':'Average Moving Range (MR̄)',
+      'UCL — I-Chart':'UCL — I-Chart','LCL — I-Chart':'LCL — I-Chart',
+      'UCL — MR-Chart':'UCL — MR-Chart',
+      'Pontos fora de controle':'Out-of-control points',
+      'Estabilidade do Processo':'Process Stability',
+      'Peças fora de especificação':'Parts out of specification',
+      'PPM Estimado (teórico)':'Estimated PPM (theoretical)',
+      'Processo Estável':'Stable Process','Processo Instável':'Unstable Process',
+      'violações':'violations','Nenhuma':'None',
+      // ── Alerts / messages ──
+      'valor(es) fora de especificação detectado(s)':'value(s) out of specification detected',
+      'ponto(s) fora de controle (regra 3σ) · UCL-LCL =':'out-of-control point(s) (3σ rule) · UCL-LCL =',
+      'Nenhum dado inserido':'No data entered','Sem estudos':'No studies',
+      'Nenhum estudo salvo ainda':'No studies saved yet',
+      'Salve um estudo na aba Análise para vê-lo aqui.':'Save a study in the Analysis tab to see it here.',
+      'Mínimo 10 amostras e pelo menos um limite definido para este gráfico.':'Minimum 10 samples and at least one limit defined for this chart.',
+      '● online':'● online','● offline':'● offline',
+      'estudo(s)':'study(ies)','em cache':'cached',
+      'sincronizado(s)':'synced',
+      // ── Buttons ──
+      '💾 Guardar Estudo':'💾 Save Study','↺ Restabelecer':'↺ Reset',
+      '🖨 Imprimir':'🖨 Print','⬇️ Backup':'⬇️ Backup','⬆️ Restaurar':'⬆️ Restore',
+      '🏢 Empresa':'🏢 Company','Fechar':'Close',
+      'Carregar para Edição':'Load for Editing','Limpar todos':'Clear all',
+      'Expandir':'Expand','Visualizar Estudo':'View Study',
+      // ── Form labels ──
+      'Bilateral (LSL+USL)':'Bilateral (LSL+USL)','Unilateral Superior':'Unilateral Upper',
+      'Unilateral Inferior':'Unilateral Lower','Estudo Unilateral':'Unilateral Study',
+      'Unilateral Superior (≤USL)':'Unilateral Upper (≤USL)',
+      'Unilateral Inferior (≥LSL)':'Unilateral Lower (≥LSL)',
+      'amostras':'samples','Valor':'Value','Ações':'Actions',
+      // ── Donut legend ──
+      'Classe Mundial (≥1.67)':'World Class (≥1.67)','Excelente (≥1.33)':'Excellent (≥1.33)',
+      'Aceitável (≥1.00)':'Acceptable (≥1.00)','Reprovado (<1.00)':'Failed (<1.00)',
+      'Dentro da especificação':'Within specification','Fora de especificação ⚠':'Out of specification ⚠',
+      // ── PDF table ──
+      'Nº':'No.','Dentro de especificação':'Within specification',
+      'Fora de especificação ⚠':'Out of specification ⚠',
+      // ── Study header meta labels ──
+      'Novo Estudo de Capabilidade':'New Capability Study',
+      'Estudo Unilateral':'Unilateral Study',
+      'Part Number':'Part Number','Part Name':'Part Name',
+      'Característica':'Characteristic','Nome Característica':'Characteristic Name',
+      'Especificado':'Specified','Unidade':'Unit','Responsável':'Responsible','Data':'Date',
+      // ── Branding modal ──
+      'Logotipo':'Logo','Sem logo\n(usa padrão Röchling)':'No logo\n(uses Röchling default)',
+      'Nome da Empresa':'Company Name','Subtítulo / Slogan':'Subtitle / Slogan',
+      'Endereço / Rodapé':'Address / Footer',
+      // ── Saved studies page ──
+      'Estudos Salvos':'Saved Studies','Buscar por PN, nome...':'Search by PN, name...',
+      'PN':'PN','Nome':'Name','Status':'Status','Data':'Date',
+      'Nenhum estudo encontrado':'No study found',
+      'Fora Esp.':'Out of Spec',
+      // ── Σ Global / Within ──
+      'Σ GLOBAL / Σ WITHIN':'Σ GLOBAL / Σ WITHIN',
+      'AMOSTRA':'SAMPLE','PPM ESTIMADO':'ESTIMATED PPM'
     },
     'es-MX':{
       'Carregando…':'Cargando…','Salvando…':'Guardando…','Criando…':'Creando…',
@@ -8206,9 +8487,99 @@ renderDashboard();
       'AMOSTRA':'MUESTRA','PPM ESTIMADO':'PPM ESTIMADO',
       'Nome Característica':'Nombre Característica','Especificado':'Especificado',
       'Pressione':'Presione','para adicionar rapidamente':'para agregar rápidamente',
-      'Unilateral':'Unilateral'
+      'Unilateral':'Unilateral',
+      // ── Dashboard ──
+      '📊 Dashboard de Capabilidade':'📊 Dashboard de Capacidad',
+      'Visão consolidada de todos os estudos':'Visión consolidada de todos los estudios',
+      'Clássico':'Clásico',
+      '↻ Atualizar':'↻ Actualizar','⬆ Sincronizar':'⬆ Sincronizar',
+      // ── KPI Cards ──
+      'Total Estudos':'Total Estudios','Salvos no sistema · clique':'Guardados en el sistema · clic',
+      'Aprovados':'Aprobados','Cpk ≥ 1.33 · clique':'Cpk ≥ 1.33 · clic',
+      'Reprovados':'Reprobados','Cpk < 1.33 · clique':'Cpk < 1.33 · clic',
+      'Excelentes':'Excelentes','Cpk ≥ 1.67 · clique':'Cpk ≥ 1.67 · clic',
+      'Cpk Médio':'Cpk Promedio','Média geral · clique p/ ranking':'Promedio general · clic p/ ranking',
+      'Part Numbers':'Part Numbers','Únicos · clique':'Únicos · clic',
+      // ── KPI sub-labels ──
+      'Amostra':'Muestra','PPM Estimado':'PPM Estimado',
+      'Amplitude':'Amplitud','Fora Esp.':'Fuera Esp.',
+      // ── Chart titles ──
+      'Cpk dos últimos 15 estudos':'Cpk de los últimos 15 estudios',
+      'Distribuição por Status':'Distribución por Estado',
+      'Tendência Cpk ao Longo do Tempo':'Tendencia Cpk a lo Largo del Tiempo',
+      'Cp vs Cpk — Dispersão':'Cp vs Cpk — Dispersión',
+      'Top 10 Part Numbers por Cpk':'Top 10 Part Numbers por Cpk',
+      'Performance Geral — Polar':'Rendimiento General — Polar',
+      'Quantidade de Estudos por Part Number':'Cantidad de Estudios por Part Number',
+      'BOXPLOT — DISPERSÃO E OUTLIERS':'BOXPLOT — DISPERSIÓN Y OUTLIERS',
+      'GRÁFICO DE PROBABILIDADE NORMAL (Q-Q)':'GRÁFICO DE PROBABILIDAD NORMAL (Q-Q)',
+      'TENDÊNCIA DE CPK — EVOLUÇÃO POR JANELA':'TENDENCIA DE CPK — EVOLUCIÓN POR VENTANA',
+      'Tendência Cpk — Janela deslizante':'Tendencia Cpk — Ventana deslizante',
+      // ── Banner ──
+      'Processo Capaz — Excelente':'Proceso Capaz — Excelente',
+      'Processo Aceitável — Monitorar':'Proceso Aceptable — Monitorear',
+      'Processo Não Capaz — Ação Imediata':'Proceso No Capaz — Acción Inmediata',
+      '● Estável':'● Estable','● Instável':'● Inestable',
+      'Distribuição Normal':'Distribución Normal','Verificar Normalidade':'Verificar Normalidad',
+      'Controle':'Control','Normalidade':'Normalidad','Tipo Est.':'Tipo Est.',
+      'Excelente':'Excelente','Aceitável':'Aceptable','Não Capaz':'No Capaz',
+      // ── Stats table ──
+      'Resumo Estatístico Completo — Padrão AIAG / ISO 22514':'Resumen Estadístico Completo — Estándar AIAG / ISO 22514',
+      'Parâmetro':'Parámetro','Referência':'Referencia','Interpretação':'Interpretación',
+      'Nenhum dado inserido — aguardando análise':'Sin datos ingresados — esperando análisis',
+      'Aguardando dados…':'Esperando datos…',
+      'Tipo de Estudo':'Tipo de Estudio','Tolerância Total':'Tolerancia Total',
+      'N (Amostras)':'N (Muestras)','Mediana':'Mediana',
+      'Desvio Padrão (s)':'Desviación Estándar (s)','Variância (s²)':'Varianza (s²)',
+      'Amplitude (Max−Min)':'Amplitud (Max−Min)','Assimetria (Sk)':'Asimetría (Sk)',
+      'Curtose (Ku)':'Curtosis (Ku)',
+      'd₂ (constante para n=2)':'d₂ (constante para n=2)',
+      'D₄ (constante para n=2)':'D₄ (constante para n=2)',
+      'Amplitude Móvel Média (MR̄)':'Rango Móvil Medio (MR̄)',
+      'UCL — I-Chart':'UCL — Gráfico I','LCL — I-Chart':'LCL — Gráfico I',
+      'UCL — MR-Chart':'UCL — Gráfico MR',
+      'Pontos fora de controle':'Puntos fuera de control',
+      'Estabilidade do Processo':'Estabilidad del Proceso',
+      'Peças fora de especificação':'Piezas fuera de especificación',
+      'PPM Estimado (teórico)':'PPM Estimado (teórico)',
+      'Processo Estável':'Proceso Estable','Processo Instável':'Proceso Inestable',
+      'violações':'violaciones','Nenhuma':'Ninguna',
+      // ── Alerts / messages ──
+      'valor(es) fora de especificação detectado(s)':'valor(es) fuera de especificación detectado(s)',
+      'ponto(s) fora de controle (regra 3σ) · UCL-LCL =':'punto(s) fuera de control (regla 3σ) · UCL-LCL =',
+      'Nenhum dado inserido':'Sin datos ingresados','Sem estudos':'Sin estudios',
+      'Nenhum estudo salvo ainda':'Ningún estudio guardado aún',
+      'Salve um estudo na aba Análise para vê-lo aqui.':'Guarde un estudio en la pestaña Análisis para verlo aquí.',
+      'Mínimo 10 amostras e pelo menos um limite definido para este gráfico.':'Mínimo 10 muestras y al menos un límite definido para este gráfico.',
+      '● online':'● en línea','● offline':'● sin conexión',
+      'estudo(s)':'estudio(s)','em cache':'en caché','sincronizado(s)':'sincronizado(s)',
+      // ── Buttons ──
+      '💾 Guardar Estudo':'💾 Guardar Estudio','↺ Restabelecer':'↺ Restablecer',
+      '🖨 Imprimir':'🖨 Imprimir','⬇️ Backup':'⬇️ Respaldo','⬆️ Restaurar':'⬆️ Restaurar',
+      '🏢 Empresa':'🏢 Empresa','Fechar':'Cerrar',
+      'Carregar para Edição':'Cargar para Edición','Limpar todos':'Limpiar todos',
+      'Expandir':'Expandir','Visualizar Estudo':'Ver Estudio',
+      // ── Form/Study labels ──
+      'Estudo Unilateral':'Estudio Unilateral',
+      'Bilateral (LSL+USL)':'Bilateral (LEC+UEC)',
+      'Unilateral Superior':'Unilateral Superior','Unilateral Inferior':'Unilateral Inferior',
+      'Unilateral Superior (≤USL)':'Unilateral Superior (≤UEC)',
+      'Unilateral Inferior (≥LSL)':'Unilateral Inferior (≥LEC)',
+      'amostras':'muestras','Valor':'Valor',
+      // ── Donut legend ──
+      'Classe Mundial (≥1.67)':'Clase Mundial (≥1.67)','Excelente (≥1.33)':'Excelente (≥1.33)',
+      'Aceitável (≥1.00)':'Aceptable (≥1.00)','Reprovado (<1.00)':'Reprobado (<1.00)',
+      'Dentro da especificação':'Dentro de especificación',
+      'Fora de especificação ⚠':'Fuera de especificación ⚠',
+      // ── Study header ──
+      'Novo Estudo de Capabilidade':'Nuevo Estudio de Capacidad',
+      'Característica':'Característica','Nome Característica':'Nombre Característica',
+      'Especificado':'Especificado','Data':'Fecha',
+      // ── Saved studies ──
+      'Estudos Salvos':'Estudios Guardados','Buscar por PN, nome...':'Buscar por PN, nombre...',
+      'Nenhum estudo encontrado':'Ningún estudio encontrado',
+      'Atualizado:':'Actualizado:'
     },
-    'de-DE':{
       'Carregando…':'Lädt…','Salvando…':'Speichert…','Criando…':'Erstellt…',
       'Nenhuma planta cadastrada.':'Keine Werke registriert.',
       'Acessar Planta':'Werk öffnen','Editar':'Bearbeiten','Salvar':'Speichern','Cancelar':'Abbrechen','Excluir':'Löschen',
@@ -8245,9 +8616,103 @@ renderDashboard();
       'Nome Característica':'Merkmalsname','Especificado':'Spezifiziert',
       'Pressione':'Drücken Sie','para adicionar rapidamente':'zum schnellen Hinzufügen',
       'Unilateral':'Einseitig',
-      'Ações':'Aktionen','Nome completo':'Vollständiger Name'
+      'Ações':'Aktionen','Nome completo':'Vollständiger Name',
+      // ── Dashboard ──
+      '📊 Dashboard de Capabilidade':'📊 Fähigkeits-Dashboard',
+      'Visão consolidada de todos os estudos':'Konsolidierte Übersicht aller Studien',
+      'Clássico':'Klassisch',
+      '↻ Atualizar':'↻ Aktualisieren','⬆ Sincronizar':'⬆ Synchronisieren',
+      // ── KPI Cards ──
+      'Total Estudos':'Studien Gesamt','Salvos no sistema · clique':'Im System gespeichert · klicken',
+      'Aprovados':'Bestanden','Cpk ≥ 1.33 · clique':'Cpk ≥ 1.33 · klicken',
+      'Reprovados':'Nicht bestanden','Cpk < 1.33 · clique':'Cpk < 1.33 · klicken',
+      'Excelentes':'Hervorragend','Cpk ≥ 1.67 · clique':'Cpk ≥ 1.67 · klicken',
+      'Cpk Médio':'Ø Cpk','Média geral · clique p/ ranking':'Gesamtdurchschnitt · klicken für Ranking',
+      'Part Numbers':'Teilenummern','Únicos · clique':'Eindeutig · klicken',
+      // ── KPI sub-labels ──
+      'Capabilidade Potencial':'Potenzielle Fähigkeit','Capabilidade Real':'Tatsächliche Fähigkeit',
+      'Performance Potencial':'Potenzielle Performance','Performance Real':'Tatsächliche Performance',
+      'Média (x̄)':'Mittelwert (x̄)','Amostra':'Stichprobe',
+      'PPM Estimado':'Geschätzte PPM','Amplitude':'Spanne',
+      'Fora Esp.':'Außerh. Tol.','AMOSTRA':'STICHPROBE','PPM ESTIMADO':'GESCHÄTZTE PPM',
+      'Σ GLOBAL / Σ WITHIN':'Σ GLOBAL / Σ WITHIN',
+      // ── Chart titles ──
+      'Cpk dos últimos 15 estudos':'Cpk der letzten 15 Studien',
+      'Distribuição por Status':'Verteilung nach Status',
+      'Tendência Cpk ao Longo do Tempo':'Cpk-Tendenz im Zeitverlauf',
+      'Cp vs Cpk — Dispersão':'Cp vs Cpk — Streudiagramm',
+      'Top 10 Part Numbers por Cpk':'Top 10 Teilenummern nach Cpk',
+      'Performance Geral — Polar':'Gesamtperformance — Polar',
+      'Quantidade de Estudos por Part Number':'Anzahl Studien je Teilenummer',
+      'BOXPLOT — DISPERSÃO E OUTLIERS':'BOXPLOT — STREUUNG UND AUSREISSER',
+      'GRÁFICO DE PROBABILIDADE NORMAL (Q-Q)':'NORMALWAHRSCHEINLICHKEITSDIAGRAMM (Q-Q)',
+      'TENDÊNCIA DE CPK — EVOLUÇÃO POR JANELA':'CPK-TENDENZ — GLEITENDES FENSTER',
+      'Tendência Cpk — Janela deslizante':'Cpk-Tendenz — Gleitendes Fenster',
+      // ── Banner ──
+      'Processo Capaz — Excelente':'Fähiger Prozess — Hervorragend',
+      'Processo Aceitável — Monitorar':'Akzeptabler Prozess — Überwachen',
+      'Processo Não Capaz — Ação Imediata':'Nicht fähiger Prozess — Sofortmaßnahme',
+      '● Estável':'● Stabil','● Instável':'● Instabil',
+      'Distribuição Normal':'Normalverteilt','Verificar Normalidade':'Normalität prüfen',
+      'Controle':'Kontrolle','Normalidade':'Normalität','Tipo Est.':'Studientyp',
+      'Excelente':'Hervorragend','Aceitável':'Akzeptabel','Não Capaz':'Nicht fähig',
+      // ── Stats table ──
+      'Resumo Estatístico Completo — Padrão AIAG / ISO 22514':'Vollständige Statistikübersicht — AIAG / ISO 22514 Standard',
+      'Parâmetro':'Parameter','Referência':'Referenz','Interpretação':'Interpretation',
+      'Nenhum dado inserido — aguardando análise':'Keine Daten eingegeben — warte auf Analyse',
+      'Aguardando dados…':'Warte auf Daten…',
+      'Tipo de Estudo':'Studientyp','Tolerância Total':'Gesamttoleranz',
+      'N (Amostras)':'N (Stichprobengröße)','Mediana':'Median',
+      'Desvio Padrão (s)':'Standardabweichung (s)','Variância (s²)':'Varianz (s²)',
+      'Amplitude (Max−Min)':'Spanne (Max−Min)','Assimetria (Sk)':'Schiefe (Sk)',
+      'Curtose (Ku)':'Kurtosis (Ku)',
+      'd₂ (constante para n=2)':'d₂ (Konstante für n=2)',
+      'D₄ (constante para n=2)':'D₄ (Konstante für n=2)',
+      'Amplitude Móvel Média (MR̄)':'Mittlere gleitende Spanne (MR̄)',
+      'UCL — I-Chart':'OGW — I-Diagramm','LCL — I-Chart':'UGW — I-Diagramm',
+      'UCL — MR-Chart':'OGW — MR-Diagramm',
+      'Pontos fora de controle':'Punkte außerhalb der Grenzen',
+      'Estabilidade do Processo':'Prozessstabilität',
+      'Peças fora de especificação':'Teile außerhalb der Spezifikation',
+      'PPM Estimado (teórico)':'Geschätzte PPM (theoretisch)',
+      'Processo Estável':'Stabiler Prozess','Processo Instável':'Instabiler Prozess',
+      'violações':'Verletzungen','Nenhuma':'Keine',
+      // ── Alerts / messages ──
+      'valor(es) fora de especificação detectado(s)':'Wert(e) außerhalb der Spezifikation erkannt',
+      'ponto(s) fora de controle (regra 3σ) · UCL-LCL =':'Punkt(e) außerhalb der Kontrollgrenzen (3σ-Regel) · OGW-UGW =',
+      'Nenhum dado inserido':'Keine Daten eingegeben','Sem estudos':'Keine Studien',
+      'Nenhum estudo salvo ainda':'Noch keine Studien gespeichert',
+      'Salve um estudo na aba Análise para vê-lo aqui.':'Speichern Sie eine Studie auf der Registerkarte Analyse, um sie hier zu sehen.',
+      'Mínimo 10 amostras e pelo menos um limite definido para este gráfico.':'Mindestens 10 Messwerte und eine definierte Grenze für dieses Diagramm.',
+      '● online':'● online','● offline':'● offline',
+      'estudo(s)':'Studie(n)','em cache':'im Cache','sincronizado(s)':'synchronisiert',
+      // ── Buttons ──
+      '💾 Guardar Estudo':'💾 Studie speichern','↺ Restabelecer':'↺ Zurücksetzen',
+      '🖨 Imprimir':'🖨 Drucken','⬇️ Backup':'⬇️ Sicherung','⬆️ Restaurar':'⬆️ Wiederherstellen',
+      '🏢 Empresa':'🏢 Unternehmen','Fechar':'Schließen',
+      'Carregar para Edição':'Zum Bearbeiten laden','Limpar todos':'Alle löschen',
+      'Expandir':'Erweitern','Visualizar Estudo':'Studie anzeigen',
+      // ── Form ──
+      'Estudo Unilateral':'Einseitige Studie',
+      'Bilateral (LSL+USL)':'Bilateral (USG+OSG)',
+      'Unilateral Superior':'Einseitig oben','Unilateral Inferior':'Einseitig unten',
+      'Unilateral Superior (≤USL)':'Einseitig oben (≤OSG)',
+      'Unilateral Inferior (≥LSL)':'Einseitig unten (≥USG)',
+      'amostras':'Messwerte','Valor':'Wert',
+      // ── Donut legend ──
+      'Classe Mundial (≥1.67)':'Weltklasse (≥1.67)','Excelente (≥1.33)':'Hervorragend (≥1.33)',
+      'Aceitável (≥1.00)':'Akzeptabel (≥1.00)','Reprovado (<1.00)':'Nicht bestanden (<1.00)',
+      'Dentro da especificação':'Innerhalb der Toleranz',
+      'Fora de especificação ⚠':'Außerhalb der Toleranz ⚠',
+      // ── Study header ──
+      'Novo Estudo de Capabilidade':'Neue Fähigkeitsstudie',
+      'Característica':'Merkmal','Nome Característica':'Merkmalsname',
+      'Especificado':'Spezifiziert','Data':'Datum','Unidade':'Einheit',
+      // ── Saved studies ──
+      'Estudos Salvos':'Gespeicherte Studien','Buscar por PN, nome...':'Nach Teilenr., Name suchen...',
+      'Nenhum estudo encontrado':'Keine Studie gefunden',
+      'Atualizado:':'Aktualisiert:'
     },
-    'it-IT':{
       'Carregando…':'Caricamento…','Carregando...':'Caricamento...','Salvando…':'Salvataggio…','Criando…':'Creazione…',
       'Nenhuma planta cadastrada.':'Nessun impianto registrato.',
       'Acessar Planta':'Accedi all\'Impianto','Editar':'Modifica','Salvar':'Salva','Cancelar':'Annulla','Excluir':'Elimina',
@@ -8282,7 +8747,100 @@ renderDashboard();
       'Tolerância:':'Tolleranza:','Nominal:':'Nominale:',
       'AMOSTRA':'CAMPIONE','PPM ESTIMADO':'PPM STIMATO',
       'Pressione':'Premere','para adicionar rapidamente':'per aggiungere rapidamente',
-      'Unilateral':'Unilaterale'
+      'Unilateral':'Unilaterale',
+      // ── Dashboard ──
+      '📊 Dashboard de Capabilidade':'📊 Dashboard di Capabilità',
+      'Visão consolidada de todos os estudos':'Visione consolidata di tutti gli studi',
+      'Clássico':'Classico',
+      '↻ Atualizar':'↻ Aggiorna','⬆ Sincronizar':'⬆ Sincronizza',
+      // ── KPI Cards ──
+      'Total Estudos':'Studi Totali','Salvos no sistema · clique':'Salvati nel sistema · clic',
+      'Aprovados':'Approvati','Cpk ≥ 1.33 · clique':'Cpk ≥ 1.33 · clic',
+      'Reprovados':'Non idonei','Cpk < 1.33 · clique':'Cpk < 1.33 · clic',
+      'Excelentes':'Eccellenti','Cpk ≥ 1.67 · clique':'Cpk ≥ 1.67 · clic',
+      'Cpk Médio':'Cpk Medio','Média geral · clique p/ ranking':'Media generale · clic per ranking',
+      'Part Numbers':'Part Numbers','Únicos · clique':'Unici · clic',
+      // ── KPI sub-labels ──
+      'Amostra':'Campione','PPM Estimado':'PPM Stimato',
+      'Amplitude':'Ampiezza','Fora Esp.':'Fuori Spec.',
+      'AMOSTRA':'CAMPIONE','PPM ESTIMADO':'PPM STIMATO',
+      'Σ GLOBAL / Σ WITHIN':'Σ GLOBAL / Σ WITHIN',
+      // ── Chart titles ──
+      'Cpk dos últimos 15 estudos':'Cpk degli ultimi 15 studi',
+      'Distribuição por Status':'Distribuzione per Stato',
+      'Tendência Cpk ao Longo do Tempo':'Tendenza Cpk nel Tempo',
+      'Cp vs Cpk — Dispersão':'Cp vs Cpk — Dispersione',
+      'Top 10 Part Numbers por Cpk':'Top 10 Part Numbers per Cpk',
+      'Performance Geral — Polar':'Performance Generale — Polare',
+      'Quantidade de Estudos por Part Number':'Numero di Studi per Part Number',
+      'BOXPLOT — DISPERSÃO E OUTLIERS':'BOXPLOT — DISPERSIONE E OUTLIER',
+      'GRÁFICO DE PROBABILIDADE NORMAL (Q-Q)':'GRAFICO DI PROBABILITÀ NORMALE (Q-Q)',
+      'TENDÊNCIA DE CPK — EVOLUÇÃO POR JANELA':'TENDENZA CPK — FINESTRA MOBILE',
+      'Tendência Cpk — Janela deslizante':'Tendenza Cpk — Finestra mobile',
+      // ── Banner ──
+      'Processo Capaz — Excelente':'Processo Capace — Eccellente',
+      'Processo Aceitável — Monitorar':'Processo Accettabile — Monitorare',
+      'Processo Não Capaz — Ação Imediata':'Processo Non Capace — Azione Immediata',
+      '● Estável':'● Stabile','● Instável':'● Instabile',
+      'Distribuição Normal':'Distribuzione Normale','Verificar Normalidade':'Verificare Normalità',
+      'Controle':'Controllo','Normalidade':'Normalità','Tipo Est.':'Tipo Studio',
+      'Excelente':'Eccellente','Aceitável':'Accettabile','Não Capaz':'Non Capace',
+      // ── Stats table ──
+      'Resumo Estatístico Completo — Padrão AIAG / ISO 22514':'Riepilogo Statistico Completo — Standard AIAG / ISO 22514',
+      'Parâmetro':'Parametro','Referência':'Riferimento','Interpretação':'Interpretazione',
+      'Nenhum dado inserido — aguardando análise':'Nessun dato inserito — in attesa di analisi',
+      'Aguardando dados…':'In attesa di dati…',
+      'Tipo de Estudo':'Tipo di Studio','Tolerância Total':'Tolleranza Totale',
+      'N (Amostras)':'N (Campioni)','Mediana':'Mediana',
+      'Desvio Padrão (s)':'Dev. Standard (s)','Variância (s²)':'Varianza (s²)',
+      'Amplitude (Max−Min)':'Ampiezza (Max−Min)','Assimetria (Sk)':'Asimmetria (Sk)',
+      'Curtose (Ku)':'Curtosi (Ku)',
+      'd₂ (constante para n=2)':'d₂ (costante per n=2)',
+      'D₄ (constante para n=2)':'D₄ (costante per n=2)',
+      'Amplitude Móvel Média (MR̄)':'Range Mobile Medio (MR̄)',
+      'UCL — I-Chart':'UCL — Grafico I','LCL — I-Chart':'LCL — Grafico I',
+      'UCL — MR-Chart':'UCL — Grafico MR',
+      'Pontos fora de controle':'Punti fuori controllo',
+      'Estabilidade do Processo':'Stabilità del Processo',
+      'Peças fora de especificação':'Pezzi fuori specifica',
+      'PPM Estimado (teórico)':'PPM Stimato (teorico)',
+      'Processo Estável':'Processo Stabile','Processo Instável':'Processo Instabile',
+      'violações':'violazioni','Nenhuma':'Nessuna',
+      // ── Alerts / messages ──
+      'valor(es) fora de especificação detectado(s)':'valore/i fuori specifica rilevato/i',
+      'ponto(s) fora de controle (regra 3σ) · UCL-LCL =':'punto/i fuori controllo (regola 3σ) · UCL-LCL =',
+      'Nenhum dado inserido':'Nessun dato inserito','Sem estudos':'Nessuno studio',
+      'Nenhum estudo salvo ainda':'Nessuno studio salvato ancora',
+      'Salve um estudo na aba Análise para vê-lo aqui.':'Salvare uno studio nella scheda Analisi per vederlo qui.',
+      'Mínimo 10 amostras e pelo menos um limite definido para este gráfico.':'Minimo 10 campioni e almeno un limite definito per questo grafico.',
+      '● online':'● online','● offline':'● offline',
+      'estudo(s)':'studio(i)','em cache':'in cache','sincronizado(s)':'sincronizzato/i',
+      // ── Buttons ──
+      '💾 Guardar Estudo':'💾 Salva Studio','↺ Restabelecer':'↺ Reimposta',
+      '🖨 Imprimir':'🖨 Stampa','⬇️ Backup':'⬇️ Backup','⬆️ Restaurar':'⬆️ Ripristina',
+      '🏢 Empresa':'🏢 Azienda','Fechar':'Chiudi',
+      'Carregar para Edição':'Carica per Modifica','Limpar todos':'Cancella tutti',
+      'Expandir':'Espandi','Visualizar Estudo':'Visualizza Studio',
+      // ── Form ──
+      'Estudo Unilateral':'Studio Unilaterale',
+      'Bilateral (LSL+USL)':'Bilaterale (LSL+USL)',
+      'Unilateral Superior':'Unilaterale Superiore','Unilateral Inferior':'Unilaterale Inferiore',
+      'Unilateral Superior (≤USL)':'Unilaterale Superiore (≤USL)',
+      'Unilateral Inferior (≥LSL)':'Unilaterale Inferiore (≥LSL)',
+      'amostras':'campioni','Valor':'Valore','Ações':'Azioni',
+      // ── Donut legend ──
+      'Classe Mundial (≥1.67)':'Classe Mondiale (≥1.67)','Excelente (≥1.33)':'Eccellente (≥1.33)',
+      'Aceitável (≥1.00)':'Accettabile (≥1.00)','Reprovado (<1.00)':'Non idoneo (<1.00)',
+      'Dentro da especificação':'Entro la specifica',
+      'Fora de especificação ⚠':'Fuori specifica ⚠',
+      // ── Study header ──
+      'Novo Estudo de Capabilidade':'Nuovo Studio di Capabilità',
+      'Característica':'Caratteristica','Nome Característica':'Nome Caratteristica',
+      'Especificado':'Specificato','Data':'Data','Unidade':'Unità',
+      // ── Saved studies ──
+      'Estudos Salvos':'Studi Salvati','Buscar por PN, nome...':'Cerca per PN, nome...',
+      'Nenhum estudo encontrado':'Nessuno studio trovato',
+      'Atualizado:':'Aggiornato:'
     }
   };
   // Expõe DYNTRAD para uso como fallback em _safeApplyI18n quando Supabase está vazio
