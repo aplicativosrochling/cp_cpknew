@@ -1799,7 +1799,10 @@ body {
   .study-header { display: block !important; margin: 0 0 3mm 0 !important; padding: 6px 10px !important; background: #f8f9fe !important; box-shadow: none !important; border: 1px solid #c8cee0 !important; border-left: 3.5px solid #1565C0 !important; border-radius: 4px !important; }
   .kpi-strip { display: grid !important; grid-template-columns: repeat(6, 1fr) !important; gap: 3px !important; }
   .charts-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 3mm !important; }
-  .chart-card { display: block !important; padding: 6px 8px !important; background: #fff !important; box-shadow: none !important; border: 1px solid #d0d5e8 !important; border-radius: 4px !important; }
+  .chart-card { display: block !important; padding: 6px 8px !important; background: #fff !important; box-shadow: none !important; border: 1px solid #d0d5e8 !important; border-radius: 4px !important; overflow: hidden !important; page-break-inside: avoid !important; break-inside: avoid !important; box-sizing: border-box !important; max-width: 100% !important; }
+  .chart-area { overflow: hidden !important; max-width: 100% !important; }
+  .chart-area canvas { max-width: 100% !important; width: 100% !important; height: auto !important; }
+  .study-header, .kpi-strip { page-break-inside: avoid !important; break-inside: avoid !important; }
   .stats-wrap { display: block !important; border: 1px solid #c8cee0 !important; border-radius: 4px !important; margin-top: 3mm !important; }
   .print-data-section { display: block !important; padding: 6px 10px !important; background: #fff !important; border: 1px solid #c8cee0 !important; border-top: none !important; border-radius: 0 0 4px 4px !important; }
   .print-footer { display: flex !important; justify-content: space-between !important; padding: 4mm 0 0 0 !important; margin-top: 4mm !important; border-top: 1.5px solid #c8cee0 !important; font-size: 7px !important; color: #7a82a0 !important; }
@@ -3085,7 +3088,7 @@ function renderCMDash() {
    FULLSCREEN MODAL (Clean Minimal)
    ============================================================ */
 function cmOpenStudy(id) {
-  var study = STUDIES.find(function(s) { return s.id === id; });
+  var study = STUDIES.find(function(s) { return String(s.id) === String(id); });
   if (!study) return;
   _cmOpenStudyId = id;
   var st = study.stats || {};
@@ -5192,7 +5195,7 @@ window.refreshStudiesFromSupabase = refreshStudiesFromSupabase;
 
 function loadStudyToEditor(id) {
   var sid = id || currentStudyId;
-  var study = STUDIES.find(function(s) { return s.id === sid; });
+  var study = STUDIES.find(function(s) { return String(s.id) === String(sid); });
   if (!study) return;
   var fields = { iPN: 'pn', iPartName: 'pname', iCharCode: 'cc', iCharName: 'cn', iSpecBy: 'specBy', iUnit: 'unit', iOwner: 'owner', iDate: 'date', iEquip: 'equip', iReport: 'report', iNotes: 'notes' };
   Object.entries(fields).forEach(function(_ref) {
@@ -5298,7 +5301,7 @@ function renderStudiesList() {
 
 function openStudyModal(id) {
   currentStudyId = id;
-  var s = STUDIES.find(function(s2) { return s2.id === id; });
+  var s = STUDIES.find(function(s2) { return String(s2.id) === String(id); });
   if (!s) return;
   var st = s.stats;
   var cls = st.Cpk == null ? '' : st.Cpk >= 1.67 ? 'ok' : st.Cpk >= 1.33 ? 'warn' : 'fail';
@@ -5351,8 +5354,8 @@ function deleteStudyById(id) {
   window.FB.deleteStudy(id)
     .then(function() {
       var local = JSON.parse(localStorage.getItem('spc_studies') || '[]');
-      localStorage.setItem('spc_studies', JSON.stringify(local.filter(function(s) { return s.id !== id; })));
-      STUDIES = STUDIES.filter(function(s) { return s.id !== id; });
+      localStorage.setItem('spc_studies', JSON.stringify(local.filter(function(s) { return String(s.id) !== String(id); })));
+      STUDIES = STUDIES.filter(function(s) { return String(s.id) !== String(id); });
       renderStudiesList();
       toast('Estudo excluído', 'warn');
     })
@@ -5553,12 +5556,33 @@ function printReport() {
   document.getElementById('printFooter').style.display = 'flex';
 
   setTimeout(function() {
-    window.print();
+    try {
+      if (typeof CH !== 'undefined' && CH) {
+        Object.keys(CH).forEach(function(k) {
+          if (CH[k] && typeof CH[k].resize === 'function') {
+            try { CH[k].resize(); } catch (e) {}
+          }
+        });
+      }
+    } catch (e) {}
+
     setTimeout(function() {
-      document.getElementById('printPageHeader').style.display = 'none';
-      pdSection.style.display = 'none';
-      document.getElementById('printFooter').style.display = 'none';
-    }, 1500);
+      window.print();
+      try {
+        if (typeof CH !== 'undefined' && CH) {
+          Object.keys(CH).forEach(function(k) {
+            if (CH[k] && typeof CH[k].resize === 'function') {
+              try { CH[k].resize(); } catch (e) {}
+            }
+          });
+        }
+      } catch (e) {}
+      setTimeout(function() {
+        document.getElementById('printPageHeader').style.display = 'none';
+        pdSection.style.display = 'none';
+        document.getElementById('printFooter').style.display = 'none';
+      }, 1500);
+    }, 80);
   }, 300);
 }
 
@@ -5873,13 +5897,13 @@ async function exportPDF() {
 }
 
 async function exportStudyPDF() {
-  var s = STUDIES.find(function(s2) { return s2.id === currentStudyId; });
+  var s = STUDIES.find(function(s2) { return String(s2.id) === String(currentStudyId); });
   if (!s) return;
   await exportStudyPDFById(s.id);
 }
 
 async function exportStudyPDFById(id) {
-  var s = STUDIES.find(function(s2) { return s2.id === id; });
+  var s = STUDIES.find(function(s2) { return String(s2.id) === String(id); });
   if (!s) return;
   toast('Gerando PDF do estudo…', 'info');
   var prevData = S.data.slice(),
