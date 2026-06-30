@@ -6176,8 +6176,10 @@ renderDashboard();
     var roleMap = {};
     roles.forEach(function(r) { (roleMap[r.user_id] = roleMap[r.user_id] || []).push(r.role); });
 
-    document.getElementById('kpiUserCount').textContent = profiles.length;
-    document.getElementById('aplStatUsers').textContent = profiles.length;
+    var kpiUserCountEl = document.getElementById('kpiUserCount');
+    if (kpiUserCountEl) kpiUserCountEl.textContent = profiles.length;
+    var aplStatUsersEl = document.getElementById('aplStatUsers');
+    if (aplStatUsersEl) aplStatUsersEl.textContent = profiles.length;
 
     if (!profiles.length) {
       tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;color:var(--t3);text-align:center">—</td></tr>';
@@ -6442,7 +6444,8 @@ renderDashboard();
     var profiles = pRes.data || [],
       roles = rRes.data || [],
       plants = plRes.data || [];
-    document.getElementById('aplStatUsers').textContent = profiles.length;
+    var aplStatUsersEl2 = document.getElementById('aplStatUsers');
+    if (aplStatUsersEl2) aplStatUsersEl2.textContent = profiles.length;
     var qSel = document.getElementById('aplQuickPlant');
     if (qSel) qSel.innerHTML = plants.map(function(pl) { return '<option value="' + pl.id + '">' + esc(pl.code) + ' · ' + esc(pl.language_code || 'pt-BR') + '</option>'; }).join('');
     var roleMap = {};
