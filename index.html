@@ -460,7 +460,10 @@ function initSupabaseClient() {
               .select('*')
               .order('created_at', { ascending: false });
 
-            if (!(_currentProfile && _currentProfile.role === 'admin') && _currentPlant && _currentPlant.id) {
+            // Filtra sempre pela planta atualmente selecionada — inclusive
+            // para admin, que deve ver apenas os estudos da planta que
+            // escolheu na tela de seleção (ou no seletor do topo).
+            if (_currentPlant && _currentPlant.id) {
               query = query.eq('plant_id', _currentPlant.id);
             }
 
@@ -474,6 +477,21 @@ function initSupabaseClient() {
             console.error('[SB] getAll exceção:', e);
             throw e;
           }
+        },
+
+        // Permite que telas fora deste closure (ex.: seleção de planta do
+        // admin) atualizem a planta "ativa" de verdade — a variável
+        // _currentPlant usada por getAll()/saveStudy(). Antes, código fora
+        // daqui só conseguia mexer em window.currentPlant, que é uma
+        // variável solta e NÃO tem efeito nenhum sobre o que é salvo/listado.
+        setCurrentPlant: function(plant) {
+          _currentPlant = plant || null;
+          window.currentPlant = _currentPlant;
+          if (_currentProfile) _currentProfile.activePlantId = _currentPlant && _currentPlant.id;
+        },
+
+        getCurrentPlant: function() {
+          return _currentPlant;
         },
 
         listen: function(cb) {
@@ -755,6 +773,11 @@ function initSupabaseClient() {
       }
 
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (window.__adminCreatingUser) {
+          // Evita que a tela "pisque" para o usuário recém-criado enquanto
+          // o admin está no meio do fluxo de criação de usuário.
+          return;
+        }
         setTimeout(function() { applyAuthUI(session); }, 0);
       }
     });
@@ -6180,10 +6203,17 @@ renderDashboard();
     if (!c) return;
     var { data } = await c.from('plants').select('*').eq('id', plantId).maybeSingle();
     if (data) {
-      window.currentPlant = data;
+      if (window.FB && typeof window.FB.setCurrentPlant === 'function') {
+        window.FB.setCurrentPlant(data);
+      } else {
+        window.currentPlant = data;
+      }
       applyI18n(data.language_code || 'pt-BR');
       if (typeof renderDashboard === 'function') renderDashboard();
       if (typeof renderStudiesList === 'function') renderStudiesList();
+      if (typeof window.refreshStudiesFromSupabase === 'function') {
+        try { window.refreshStudiesFromSupabase(); } catch (e) {}
+      }
     }
   };
 
@@ -6312,12 +6342,40 @@ renderDashboard();
       msg.style.color = '#b00'; return; }
     msg.textContent = 'Criando…';
     msg.style.color = 'var(--t2)';
+
+    // ⚠️ IMPORTANTE: auth.signUp() troca a sessão ativa do client para a do
+    // usuário recém-criado. Por isso guardamos a sessão do ADMIN aqui e a
+    // restauramos logo em seguida, ANTES de gravar profiles/user_roles —
+    // caso contrário essas gravações seriam feitas como o novo usuário
+    // (sem permissão), e o plant_id ficaria NULL silenciosamente.
+    window.__adminCreatingUser = true;
+    var adminSessionBackup = null;
+    try {
+      var { data: sessData } = await c.auth.getSession();
+      adminSessionBackup = sessData && sessData.session;
+    } catch (eSess) {
+      console.warn('[Admin] Não foi possível capturar sessão do admin:', eSess);
+    }
+
     try {
       var { data: authData, error: authError } = await c.auth.signUp({
         email: email,
         password: pwd,
         options: { data: { full_name: name, plant_id: plant } }
       });
+
+      // Restaura a sessão do admin IMEDIATAMENTE após o signUp, antes de
+      // qualquer outra chamada ao banco.
+      if (adminSessionBackup) {
+        try {
+          await c.auth.setSession({
+            access_token: adminSessionBackup.access_token,
+            refresh_token: adminSessionBackup.refresh_token
+          });
+        } catch (eRestore) {
+          console.warn('[Admin] Erro ao restaurar sessão do admin:', eRestore);
+        }
+      }
 
       var newUserId = null;
       if (authError) {
@@ -6345,15 +6403,21 @@ renderDashboard();
         var plantLanguage = (plantData && plantData.language_code) || 'pt-BR';
 
         var { error: profileError } = await c.from('profiles').upsert({ id: newUserId, email: email, plant_id: plant, full_name: name, is_active: true }, { onConflict: 'id' });
-        if (profileError) { console.warn('[Admin] Erro ao atualizar perfil:', profileError); }
+        if (profileError) {
+          console.error('[Admin] ❌ Erro ao gravar perfil (plant_id pode não ter sido salvo!):', profileError);
+          msg.textContent = '⚠ Usuário criado, mas houve erro ao vincular a planta: ' + profileError.message;
+          msg.style.color = '#f97316';
+        }
 
         if (role === 'admin') {
           var { error: roleError } = await c.from('user_roles').insert({ user_id: newUserId, role: 'admin' }).select();
           if (roleError) { console.warn('[Admin] Erro ao inserir role:', roleError); }
         }
 
-        msg.textContent = '✓ Usuário criado: ' + email + ' (idioma: ' + plantLanguage + ')';
-        msg.style.color = '#0a7';
+        if (!profileError) {
+          msg.textContent = '✓ Usuário criado: ' + email + ' (planta vinculada, idioma: ' + plantLanguage + ')';
+          msg.style.color = '#0a7';
+        }
       } else {
         msg.textContent = '⚠ Usuário criado apenas no banco (aguarde ativação manual)';
         msg.style.color = '#f97316';
@@ -6368,6 +6432,8 @@ renderDashboard();
       msg.textContent = '❌ ' + e.message;
       msg.style.color = '#b00';
       console.error('[Admin] Erro ao criar usuário:', e);
+    } finally {
+      window.__adminCreatingUser = false;
     }
   };
 
@@ -6437,8 +6503,11 @@ renderDashboard();
     try {
       var { data: p } = await c.from('plants').select('*').eq('id', plantId).maybeSingle();
       if (!p) { alert('Planta não encontrada.'); return; }
-      window.currentPlant = p;
-      try { window._currentPlant = p; } catch (e) {}
+      if (window.FB && typeof window.FB.setCurrentPlant === 'function') {
+        window.FB.setCurrentPlant(p);
+      } else {
+        window.currentPlant = p;
+      }
       sessionStorage.setItem('selectedPlantId', p.id);
       var targetLang = p.language_code || langCode || 'pt-BR';
       sessionStorage.setItem('selectedPlantLanguage', targetLang);
@@ -6456,6 +6525,11 @@ renderDashboard();
           ub.textContent = (u && u.email ? u.email : '') + ' · ' + p.code + ' [ADMIN]';
         }
       } catch (e) {}
+
+      // Recarrega os estudos já filtrados pela planta recém-selecionada.
+      if (typeof window.refreshStudiesFromSupabase === 'function') {
+        try { await window.refreshStudiesFromSupabase(); } catch (e) {}
+      }
 
       var navDash = document.querySelector('.nav-tab[onclick*="dashboard"]');
       if (typeof showPage === 'function') showPage('dashboard', navDash);
