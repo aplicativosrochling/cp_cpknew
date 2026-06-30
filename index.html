@@ -321,45 +321,58 @@ function initSupabaseClient() {
 
     function studyFromRow(row) {
       if (!row) return null;
+      var dataArr = _numArr(row.data_values);
+      var lsl = _num(row.lsl);
+      var usl = _num(row.usl);
+      var specType = row.spec_type || 'bilateral';
+      var stats;
+      try {
+        stats = (typeof calcAll === 'function' && dataArr.length >= 2)
+          ? calcAll(dataArr, lsl, usl, specType)
+          : null;
+      } catch (e) { stats = null; }
+      if (!stats) {
+        stats = {
+          n: dataArr.length, xbar: _num(row.mean), s: _num(row.std_dev), sw: _num(row.std_dev),
+          Cp: _num(row.cp), Cpk: _num(row.cpk), Pp: _num(row.pp), Ppk: _num(row.ppk),
+          ppm: _num(row.ppm_estimated), oos: 0, stable: true
+        };
+      }
       return {
         id: row.id,
-        partNumber: row.part_number || '',
-        partName: row.part_name || '',
-        charCode: row.char_code || '',
-        charName: row.char_name || '',
-        lsl: _num(row.lsl),
-        usl: _num(row.usl),
+        pn: row.part_number || '',
+        pname: row.part_name || '',
+        cc: row.char_code || '',
+        cn: row.char_name || '',
+        lsl: lsl,
+        usl: usl,
         target: _num(row.target),
         specBy: row.spec_by || '',
         unit: row.unit || '',
-        specType: row.spec_type || 'bilateral',
+        specType: specType,
         owner: row.owner || '',
-        studyDate: row.study_date || '',
-        equipment: row.equipment || '',
-        reportNum: row.report_num || '',
+        date: row.study_date || '',
+        equip: row.equipment || '',
+        report: row.report_num || '',
         notes: row.notes || '',
-        data: _numArr(row.data_values),
-        mean: _num(row.mean),
-        stdDev: _num(row.std_dev),
-        cp: _num(row.cp),
-        cpk: _num(row.cpk),
-        pp: _num(row.pp),
-        ppk: _num(row.ppk),
-        ppmEstimated: _num(row.ppm_estimated),
-        status: row.status || 'pending',
+        data: dataArr,
+        dec: 4,
+        stats: stats,
         plantId: row.plant_id,
         userId: row.user_id,
+        savedAt: row.updated_at || row.created_at,
         createdAt: row.created_at,
         updatedAt: row.updated_at
       };
     }
 
     function studyToRow(s) {
+      var st = s.stats || {};
       var row = {
-        part_number: s.partNumber || '',
-        part_name: s.partName || '',
-        char_code: s.charCode || '',
-        char_name: s.charName || '',
+        part_number: s.pn || '',
+        part_name: s.pname || '',
+        char_code: s.cc || '',
+        char_name: s.cn || '',
         lsl: _num(s.lsl),
         usl: _num(s.usl),
         target: _num(s.target),
@@ -367,19 +380,19 @@ function initSupabaseClient() {
         unit: s.unit || '',
         spec_type: s.specType || 'bilateral',
         owner: s.owner || '',
-        study_date: s.studyDate || null,
-        equipment: s.equipment || '',
-        report_num: s.reportNum || '',
+        study_date: s.date || null,
+        equipment: s.equip || '',
+        report_num: s.report || '',
         notes: s.notes || '',
         data_values: _numArr(s.data),
-        mean: _num(s.mean),
-        std_dev: _num(s.stdDev),
-        cp: _num(s.cp),
-        cpk: _num(s.cpk),
-        pp: _num(s.pp),
-        ppk: _num(s.ppk),
-        ppm_estimated: _num(s.ppmEstimated),
-        status: s.status || 'pending'
+        mean: _num(st.xbar),
+        std_dev: _num(st.s != null ? st.s : st.sw),
+        cp: _num(st.Cp),
+        cpk: _num(st.Cpk),
+        pp: _num(st.Pp),
+        ppk: _num(st.Ppk),
+        ppm_estimated: _num(st.ppm),
+        status: 'pending'
       };
       
       if (_currentPlant && _currentPlant.id) row.plant_id = _currentPlant.id;
