@@ -406,9 +406,12 @@ function initSupabaseClient() {
 
           var query;
           if (row.id && typeof row.id === 'number') {
+            var studyId = row.id;
+            var updateRow = Object.assign({}, row);
+            delete updateRow.id;
             query = supabaseClient.from('studies')
-              .update(row)
-              .eq('id', row.id)
+              .update(updateRow)
+              .eq('id', studyId)
               .select()
               .single();
           } else {
