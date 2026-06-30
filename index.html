@@ -700,9 +700,13 @@ function initSupabaseClient() {
       return {
         id:          row.id,
         partNumber:  row.part_number || '',
+        pn:          row.part_number || '',  // Alias
         partName:    row.part_name   || '',
+        pname:       row.part_name   || '',  // Alias
         charCode:    row.char_code   || '',
+        cc:          row.char_code   || '',  // Alias
         charName:    row.char_name   || '',
+        cn:          row.char_name   || '',  // Alias
         lsl:         _num(row.lsl),
         usl:         _num(row.usl),
         target:      _num(row.target),
@@ -711,8 +715,11 @@ function initSupabaseClient() {
         specType:    row.spec_type || 'bilateral',
         owner:       row.owner || '',
         studyDate:   row.study_date || '',
+        date:        row.study_date || '',  // Alias
         equipment:   row.equipment || '',
+        equip:       row.equipment || '',    // Alias
         reportNum:   row.report_num || '',
+        report:      row.report_num || '',   // Alias
         notes:       row.notes || '',
         data:        _numArr(row.data_values),
         mean:        _num(row.mean),
@@ -726,14 +733,28 @@ function initSupabaseClient() {
         plantId:     row.plant_id,
         userId:      row.user_id,
         createdAt:   row.created_at,
-        updatedAt:   row.updated_at
+        updatedAt:   row.updated_at,
+        savedAt:     row.created_at,  // Para compatibility
+        // ✅ ADICIONADO: Objeto stats com os dados calculados
+        stats: {
+          n:       row.n || 0,
+          xbar:    _num(row.mean),
+          s:       _num(row.std_dev),
+          Cp:      _num(row.cp),
+          Cpk:     _num(row.cpk),
+          Pp:      _num(row.pp),
+          Ppk:     _num(row.ppk),
+          ppm:     _num(row.ppm_estimated),
+          oos:     0  // Out of spec count
+        }
       };
     }
 
     // ── Helper: converter objeto estudo → row Supabase ──
     function studyToRow(s) {
       var row = {
-        id:            s.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'study-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9)),
+        // ❌ REMOVIDO: id é gerado automaticamente pelo Supabase (GENERATED ALWAYS AS IDENTITY)
+        // Não incluir 'id' permite que Supabase gere automaticamente
         part_number:   s.partNumber || '',
         part_name:     s.partName   || '',
         char_code:     s.charCode   || '',
@@ -6278,7 +6299,7 @@ function saveStudyAsNew(){
   const st=calcAll(S.data,S.lsl,S.usl,S.specType);
   const newId='S'+Date.now();
   const study={
-    id:newId,
+    // ❌ REMOVIDO: id:newId (Supabase gera automaticamente)
     savedAt:new Date().toISOString(),
     ...fd,
     stats:{n:st.n,xbar:st.xbar,s:st.s,sw:st.sw,Cp:st.Cp,Cpk:st.Cpk,Pp:st.Pp,Ppk:st.Ppk,ppm:st.ppm,oos:st.oos,stable:st.stable}
