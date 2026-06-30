@@ -54,6 +54,8 @@
   };
 })();
 </script>
+
+<script>
 const SUPABASE_URL = 'https://ladbighqhfjxybydcfya.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhZGJpZ2hxaGZqeHlieWRjZnlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTYxNTgsImV4cCI6MjA5Njc3MjE1OH0._Fdr55VlHXunQIOx_dyVLienxuj2H_D_6IpKvT8Mfe0';
 
@@ -404,7 +406,7 @@ function initSupabaseClient() {
         var { data, error } = await supabaseClient
           .from('profiles')
           .select('*, plants:plant_id(*)')
-          .eq('id', userId)
+          .eq('user_id', userId)
           .maybeSingle();
 
         if (error) { 
@@ -494,8 +496,14 @@ function initSupabaseClient() {
 
     // ── Helper: converter objeto estudo → row Supabase ──
     function studyToRow(s) {
+      // ✅ Preservar ID APENAS quando vier um id real do banco (edição).
+      // A coluna 'id' é GENERATED ALWAYS AS IDENTITY no Supabase — NÃO enviar id em INSERT.
+      // Ids locais sintéticos ('S' + timestamp) NÃO devem ser enviados.
+      var _rawId = (s && s.id) ? s.id
+        : (typeof window !== 'undefined' && window.currentStudyId) ? window.currentStudyId
+        : null;
+      var _isDbId = !!_rawId && !/^S\d+$/i.test(String(_rawId)) && !/^study-\d+/i.test(String(_rawId));
       var row = {
-        id:            s.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'study-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9)),
         part_number:   s.partNumber || '',
         part_name:     s.partName   || '',
         char_code:     s.charCode   || '',
@@ -527,6 +535,11 @@ function initSupabaseClient() {
       if (_currentSession && _currentSession.user) {
         row.user_id = _currentSession.user.id;
       }
+      // ✅ Só anexa id quando for um id real do banco (UPSERT/UPDATE).
+      // Em INSERT, omitir → coluna IDENTITY gera o valor automaticamente.
+      if (_isDbId) {
+        row.id = _rawId;
+      }
       return row;
     }
 
@@ -551,17 +564,27 @@ function initSupabaseClient() {
           if (!_currentSession) throw new Error('Não autenticado');
           var row = studyToRow(s);
 
-          var { data, error } = await supabaseClient
-            .from('studies')
-            .upsert(row, { onConflict: 'id' })
-            .select()
-            .single();
-
-          if (error) { 
-            console.error('[SB] Erro save:', error.message); 
-            throw error; 
+          // ✅ Se a row inclui id real do banco → UPDATE via upsert(onConflict:id).
+          // Caso contrário → INSERT puro, deixando IDENTITY gerar o id.
+          var query;
+          if (row.id) {
+            query = supabaseClient.from('studies')
+              .upsert(row, { onConflict: 'id' })
+              .select()
+              .single();
+          } else {
+            query = supabaseClient.from('studies')
+              .insert(row)
+              .select()
+              .single();
           }
-          console.log('[SB] ✓ Estudo salvo:', s.id);
+          var { data, error } = await query;
+
+          if (error) {
+            console.error('[SB] Erro save:', error.message);
+            throw error;
+          }
+          console.log('[SB] ✓ Estudo salvo (id DB):', data && data.id);
           return studyFromRow(data);
         },
 
@@ -678,16 +701,20 @@ function initSupabaseClient() {
           console.warn('[SB] ⚠️ Erro ao buscar perfil:', e);
         }
 
-        // Aplicar perfil (ou defaults)
+        // ✅ Aplicar perfil (ou defaults) — NUNCA desloga em caso de falha/timeout.
+        // Se o profile for null (erro ou timeout do Promise.race), prossegue com defaults
+        // e mantém a sessão ativa e a UI principal ('.app') visível.
         if (!profile) {
-          console.warn('[SB] ⚠️ Perfil não encontrado. Usando defaults temporários.');
-          profile = { 
+          console.warn('[SB] ⚠️ Perfil indisponível (falha/timeout). Mantendo sessão ativa com defaults.');
+          profile = {
             id: session.user.id,
-            role: 'user', 
+            role: 'user',
             plant_id: null,
-            plants: { code: 'Padrão', language_code: 'pt-BR' } 
+            plants: { code: 'Padrão', language_code: 'pt-BR' }
           };
         }
+        // Garantia: sessão permanece preservada mesmo se algo abaixo falhar.
+        _currentSession = session;
 
         // Buscar roles adicionais
         try {
@@ -917,21 +944,39 @@ function initSupabaseClient() {
     window.supabaseClient = supabaseClient;
     console.log('[SB] ✓ window.AUTH exposto e pronto.');
 
-    // ── Listener de estado de auth (SIMPLIFICADO) ──
+    // ── Listener de estado de auth (ROBUSTO) ──
+    // ✅ Regras:
+    //  - applyAuthUI(null) é chamado SOMENTE em SIGNED_OUT ou session explicitamente nula/vazia.
+    //  - TOKEN_REFRESHED / USER_UPDATED NÃO disparam re-render completo se já houver sessão
+    //    ativa equivalente (evita logout involuntário, perda de variáveis e flicker da UI).
     supabaseClient.auth.onAuthStateChange(function(event, session) {
       console.log('[SB] 🔄 Auth event:', event, '| Session:', session ? '✓ Sim' : '✗ Não');
 
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
-        if (session) {
-          // Usar setTimeout para não bloquear o callback do Supabase
-          setTimeout(function() {
-            applyAuthUI(session);
-          }, 0);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setTimeout(function() {
-          applyAuthUI(null);
-        }, 0);
+      // Logout estrito: só quando o evento é SIGNED_OUT.
+      if (event === 'SIGNED_OUT') {
+        setTimeout(function(){ applyAuthUI(null); }, 0);
+        return;
+      }
+
+      // Sem sessão em outros eventos → ignora (não desloga proativamente).
+      if (!session) {
+        console.log('[SB] ℹ️ Evento', event, 'sem sessão. Ignorando (não desloga).');
+        return;
+      }
+
+      // TOKEN_REFRESHED / USER_UPDATED: já existe sessão para o mesmo usuário → não re-renderiza.
+      if ((event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')
+          && _currentSession && _currentSession.user
+          && session.user && _currentSession.user.id === session.user.id) {
+        _currentSession = session; // apenas atualiza o token internamente
+        console.log('[SB] 🔁', event, '— sessão preservada, sem re-render.');
+        return;
+      }
+
+      // SIGNED_IN / INITIAL_SESSION (ou troca de usuário): aplica UI.
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION'
+          || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        setTimeout(function(){ applyAuthUI(session); }, 0);
       }
     });
 
@@ -6008,17 +6053,21 @@ function saveStudy(){
   if(!window.FB){toast('Supabase não conectado. Aguarde.','fail');return;}
   const fd=collectFormData();
   const st=calcAll(S.data,S.lsl,S.usl,S.specType);
+  // ✅ Em edição: envia currentStudyId (id real do banco) → UPDATE.
+  // Em criação: NÃO envia id (coluna IDENTITY gera) → INSERT.
   const study={
-    id:currentStudyId||'S'+Date.now(),
     savedAt:new Date().toISOString(),
     ...fd,
     stats:{n:st.n,xbar:st.xbar,s:st.s,sw:st.sw,Cp:st.Cp,Cpk:st.Cpk,Pp:st.Pp,Ppk:st.Ppk,ppm:st.ppm,oos:st.oos,stable:st.stable}
   };
+  if (currentStudyId) study.id = currentStudyId;
   const syncEl=document.getElementById('dashSyncState');
   if(syncEl){syncEl.textContent='⬆ salvando…';syncEl.style.color='var(--warn)';}
   window.FB.saveStudy(study)
-    .then(()=>{
-      currentStudyId=study.id;
+    .then((saved)=>{
+      // Usa o id retornado pelo banco como verdade.
+      if (saved && saved.id) { study.id = saved.id; currentStudyId = saved.id; }
+      else { currentStudyId = study.id; }
       const local=JSON.parse(localStorage.getItem('spc_studies')||'[]');
       const idx=local.findIndex(s=>s.id===study.id);
       if(idx>=0)local[idx]=study;else local.push(study);
@@ -6047,9 +6096,8 @@ function saveStudyAsNew(){
   if(!window.FB){toast('Supabase não conectado. Aguarde.','fail');return;}
   const fd=collectFormData();
   const st=calcAll(S.data,S.lsl,S.usl,S.specType);
-  const newId='S'+Date.now();
+  // ✅ Criação: NÃO envia id (IDENTITY gera no banco).
   const study={
-    id:newId,
     savedAt:new Date().toISOString(),
     ...fd,
     stats:{n:st.n,xbar:st.xbar,s:st.s,sw:st.sw,Cp:st.Cp,Cpk:st.Cpk,Pp:st.Pp,Ppk:st.Ppk,ppm:st.ppm,oos:st.oos,stable:st.stable}
@@ -6057,9 +6105,10 @@ function saveStudyAsNew(){
   const syncEl=document.getElementById('dashSyncState');
   if(syncEl){syncEl.textContent='⬆ salvando…';syncEl.style.color='var(--warn)';}
   window.FB.saveStudy(study)
-    .then(()=>{
-      // Atualiza currentStudyId para o novo — a partir daqui "Salvar" atualiza a cópia
-      currentStudyId=newId;
+    .then((saved)=>{
+      // Atualiza currentStudyId para o id gerado pelo banco — "Salvar" passa a atualizar a cópia.
+      const newId = (saved && saved.id) ? saved.id : null;
+      if (newId) { study.id = newId; currentStudyId = newId; }
       const local=JSON.parse(localStorage.getItem('spc_studies')||'[]');
       local.push(study);
       localStorage.setItem('spc_studies',JSON.stringify(local));
@@ -7322,7 +7371,7 @@ renderDashboard();
   window.adminSetUserPlant = async function(userId, plantId){
     var c = sb(); if(!c) return;
     try {
-      var { error } = await c.from('profiles').update({ plant_id: plantId || null }).eq('id', userId);
+      var { error } = await c.from('profiles').update({ plant_id: plantId || null }).eq('user_id', userId);
       if (error) {
         alert('Erro ao atualizar planta: '+error.message);
         return;
@@ -7365,7 +7414,7 @@ renderDashboard();
           full_name: newName,
           email: newEmail
         })
-        .eq('id', userId);
+        .eq('user_id', userId);
 
       if(profError){
         alert('❌ Erro ao editar perfil: '+profError.message);
@@ -7384,7 +7433,7 @@ renderDashboard();
     
     try {
       // 1. Deletar de profiles primeiro (por causa da FK)
-      var { error: profError } = await c.from('profiles').delete().eq('id', userId);
+      var { error: profError } = await c.from('profiles').delete().eq('user_id', userId);
       if(profError){
         alert('❌ Erro ao deletar: '+profError.message);
         return;
@@ -7417,7 +7466,7 @@ renderDashboard();
     
     var c = _c(); if(!c) return;
     try {
-      var { error } = await c.from('profiles').update({ full_name: newName }).eq('id', userId);
+      var { error } = await c.from('profiles').update({ full_name: newName }).eq('user_id', userId);
       if(error){
         alert('❌ Erro ao editar: '+error.message);
         return;
@@ -7435,7 +7484,7 @@ renderDashboard();
     var c = _c(); if(!c) return;
     try {
       // 1. Deletar de profiles primeiro (por causa da FK)
-      var { error: profError } = await c.from('profiles').delete().eq('id', userId);
+      var { error: profError } = await c.from('profiles').delete().eq('user_id', userId);
       if(profError){
         alert('❌ Erro ao deletar: '+profError.message);
         return;
@@ -7967,7 +8016,7 @@ renderDashboard();
         // FALLBACK: Tentar INSERT direto
         console.log('[APL] 📝 Tentando INSERT direto com plant_id:', plantId);
         var { error: profError } = await c.from('profiles').insert({
-          id: userId,
+          user_id: userId,
           email: email,
           full_name: name,
           plant_id: plantId,
@@ -7977,7 +8026,7 @@ renderDashboard();
         if(profError){
           console.warn('[APL] ⚠️ INSERT falhou, tentando UPSERT');
           var { error: upsertError } = await c.from('profiles').upsert({
-            id: userId,
+            user_id: userId,
             email: email,
             full_name: name,
             plant_id: plantId,
@@ -7999,7 +8048,7 @@ renderDashboard();
       
       var { data: checkData } = await c.from('profiles')
         .select('id, email, full_name, plant_id')
-        .eq('id', userId)
+        .eq('user_id', userId)
         .maybeSingle();
         
       if(checkData){
@@ -8339,7 +8388,7 @@ renderDashboard();
   window.aplEditUser = async function(userId){
     var c=_c(); if(!c) return;
     var [pRes,rRes,plRes] = await Promise.all([
-      c.from('profiles').select('*').eq('id',userId).maybeSingle(),
+      c.from('profiles').select('*').eq('user_id',userId).maybeSingle(),
       c.from('user_roles').select('role').eq('user_id',userId),
       c.from('plants').select('id,code').order('code')
     ]);
