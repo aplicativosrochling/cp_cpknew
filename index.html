@@ -19,27 +19,27 @@
 // ⚠️  SUBSTITUA ESTES VALORES PELOS DO SEU PROJETO SUPABASE
 //     Project Settings → API → URL e anon/public key
 // ═══════════════════════════════════════════════════════════════════════════════
-var SUPABASE_URL = 'https://ladbighqhfjxybydcfya.supabase.co';
-var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhZGJpZ2hxaGZqeHlieWRjZnlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTYxNTgsImV4cCI6MjA5Njc3MjE1OH0._Fdr55VlHXunQIOx_dyVLienxuj2H_D_6IpKvT8Mfe0';
+const SUPABASE_URL = 'https://ladbighqhfjxybydcfya.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhZGJpZ2hxaGZqeHlieWRjZnlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTYxNTgsImV4cCI6MjA5Njc3MjE1OH0._Fdr55VlHXunQIOx_dyVLienxuj2H_D_6IpKvT8Mfe0';
 
 // ── Verificar se veio de um seletor de plantas (sessionStorage) ──
-var _preSelectedPlantId = sessionStorage.getItem('selectedPlantId');
-var _preSelectedPlantLanguage = sessionStorage.getItem('selectedPlantLanguage') || 'pt-BR';
+const _preSelectedPlantId = sessionStorage.getItem('selectedPlantId');
+const _preSelectedPlantLanguage = sessionStorage.getItem('selectedPlantLanguage') || 'pt-BR';
 if (_preSelectedPlantId) {
   console.log('[SB] 🌿 Planta pré-selecionada encontrada:', _preSelectedPlantId, '| Idioma:', _preSelectedPlantLanguage);
 }
 
 // ── Estado global ──
-var _supabaseClient = null;
-var _currentSession = null;
-var _currentProfile = null;
-var _currentPlant = null;
-var _realtimeChannel = null;
-var _fbInitialized = false;
+let _supabaseClient = null;
+let _currentSession = null;
+let _currentProfile = null;
+let _currentPlant = null;
+let _realtimeChannel = null;
+let _fbInitialized = false;
 
 // ── Estado de i18n (tradução) ──
-var _currentLanguage = 'pt-BR';
-var i18nStrings = {};
+let _currentLanguage = 'pt-BR';
+let i18nStrings = {};
 
 function initSupabaseClient() {
   try {
@@ -147,6 +147,279 @@ function initSupabaseClient() {
       }
       document.documentElement.lang = languageCode;
       applyI18nToDOM();
+      setTimeout(function() { 
+        if (typeof window._translateChartTitles === 'function') {
+          window._translateChartTitles();
+        }
+      }, 150);
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // 🌍 SELETOR DE IDIOMA — Adicionar UI para mudar idioma
+    // ═══════════════════════════════════════════════════════════════════════
+    window.createLanguageSwitcher = function() {
+      // Verificar se já existe
+      if (document.getElementById('language-switcher-container')) return;
+
+      const container = document.createElement('div');
+      container.id = 'language-switcher-container';
+      container.style.cssText = `
+        position: fixed;
+        top: 50%;
+        right: 12px;
+        transform: translateY(-50%);
+        z-index: 9998;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: center;
+        background: rgba(255, 255, 255, 0.98);
+        padding: 10px 8px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        border: 1px solid #e0e0e0;
+        backdrop-filter: blur(10px);
+      `;
+      
+      // Estilo de impressão - esconder seletor ao imprimir
+      const style = document.createElement('style');
+      style.textContent = `
+        @media print {
+          #language-switcher-container {
+            display: none !important;
+          }
+        }
+        
+        @page {
+          margin: 0;
+        }
+      `;
+      document.head.appendChild(style);
+
+      const label = document.createElement('label');
+      label.style.cssText = `
+        font-size: 11px;
+        font-weight: 600;
+        color: #555;
+        margin: 0;
+        white-space: nowrap;
+        text-align: center;
+        letter-spacing: 0.5px;
+      `;
+      label.textContent = '🌐';
+
+      const select = document.createElement('select');
+      select.id = 'language-select';
+      select.style.cssText = `
+        padding: 6px 6px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        font-size: 11px;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        cursor: pointer;
+        background: white;
+        color: #333;
+        font-weight: 500;
+        min-width: 80px;
+      `;
+
+      // Mapeamento de idiomas disponíveis
+      const options = [
+        { value: 'pt-BR', text: 'PT 🇧🇷' },
+        { value: 'en-US', text: 'EN 🇺🇸' },
+        { value: 'es-MX', text: 'ES 🇪🇸' },
+        { value: 'it-IT', text: 'IT 🇮🇹' },
+        { value: 'de-DE', text: 'DE 🇩🇪' }
+      ];
+
+      options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.text = opt.text;
+        select.appendChild(option);
+      });
+
+      // Restaurar idioma salvo
+      const savedLang = localStorage.getItem('preferredLanguage') || 
+                        sessionStorage.getItem('selectedPlantLanguage') || 
+                        'pt-BR';
+      select.value = savedLang;
+      _currentLanguage = savedLang;
+
+      select.addEventListener('change', function() {
+        const lang = this.value;
+        localStorage.setItem('preferredLanguage', lang);
+        sessionStorage.setItem('selectedPlantLanguage', lang);
+        console.log('[i18n] 🌍 Idioma alterado para:', lang);
+        
+        // Aplicar tradução com delay para garantir renderização
+        setTimeout(async function() {
+          if (typeof window._safeApplyI18n === 'function') {
+            await window._safeApplyI18n(lang);
+          }
+          setTimeout(function() {
+            if (typeof window.applyI18nToDOM === 'function') {
+              window.applyI18nToDOM();
+            }
+            if (typeof window._forceTranslateEverything === 'function') {
+              window._forceTranslateEverything();
+            }
+            // Forçar tradução de títulos de gráficos
+            if (typeof window._translateChartTitles === 'function') {
+              window._translateChartTitles();
+            }
+            // Se há gráficos Chart.js, atualizar também
+            setTimeout(function() {
+              if (typeof window._updateAllCharts === 'function') {
+                window._updateAllCharts();
+              }
+            }, 200);
+          }, 100);
+        }, 50);
+      });
+
+      container.appendChild(label);
+      container.appendChild(select);
+      document.body.appendChild(container);
+      console.log('[i18n] ✓ Seletor de idioma criado (melhorado)');
+    };
+
+    // Função para atualizar TODOS os gráficos Chart.js
+    window._updateAllCharts = function() {
+      console.log('[i18n] 🔄 Atualizando todos os gráficos Chart.js...');
+      document.querySelectorAll('canvas').forEach((canvas, index) => {
+        try {
+          if (canvas._chartjs && canvas._chartjs.instances && canvas._chartjs.instances.length > 0) {
+            const chartInstance = canvas._chartjs.instances[0];
+            if (chartInstance) {
+              chartInstance.update('none'); // Update sem animação
+              console.log('[i18n] ✓ Gráfico', index, 'atualizado');
+            }
+          }
+        } catch (e) {
+          console.log('[i18n] ⚠️ Erro ao atualizar gráfico', index);
+        }
+      });
+    };
+
+    // Função para preparar página ANTES de imprimir
+    window._prepareForPrint = function() {
+      console.log('[i18n] 📄 Preparando para impressão/PDF...');
+      
+      // Garantir que todos os gráficos estão atualizados COM AS TRADUÇÕES
+      setTimeout(function() {
+        if (typeof window._translateChartTitles === 'function') {
+          window._translateChartTitles();
+        }
+        
+        // Aguardar um pouco e depois atualizar todos os charts
+        setTimeout(function() {
+          if (typeof window._updateAllCharts === 'function') {
+            window._updateAllCharts();
+          }
+          
+          // Agora sim, fazer print
+          setTimeout(function() {
+            window.print();
+          }, 500);
+        }, 300);
+      }, 100);
+    };
+
+    // Interceptar Ctrl+P e Print do navegador
+    window.addEventListener('beforeprint', function() {
+      console.log('[i18n] 🖨️ Evento beforeprint detectado');
+      if (typeof window._translateChartTitles === 'function') {
+        window._translateChartTitles();
+      }
+      if (typeof window._updateAllCharts === 'function') {
+        window._updateAllCharts();
+      }
+    });
+
+    // Função para traduzir títulos de gráficos especificamente
+    window._translateChartTitles = function() {
+      console.log('[i18n] 🎨 Traduzindo títulos de gráficos...');
+      const lang = _currentLanguage || 'pt-BR';
+      const dict = window._DYNTRAD && window._DYNTRAD[lang] ? window._DYNTRAD[lang] : {};
+
+      if (Object.keys(dict).length === 0) {
+        console.warn('[i18n] ⚠️ Dicionário vazio para idioma:', lang);
+        return;
+      }
+
+      // Traduzir todos os elementos com classe que contenha "title"
+      document.querySelectorAll('[class*="title"], [class*="Title"], [data-testid*="title"]').forEach(el => {
+        const text = el.textContent.trim();
+        if (text && dict[text]) {
+          el.textContent = dict[text];
+          console.log('[i18n] ✓ Elemento traduzido:', text, '→', dict[text]);
+        }
+      });
+
+      // Traduzir atributos title e aria-label
+      document.querySelectorAll('[title], [aria-label]').forEach(el => {
+        const titleText = el.getAttribute('title');
+        const ariaText = el.getAttribute('aria-label');
+        
+        if (titleText && dict[titleText]) {
+          el.setAttribute('title', dict[titleText]);
+        }
+        if (ariaText && dict[ariaText]) {
+          el.setAttribute('aria-label', dict[ariaText]);
+        }
+      });
+
+      // Traduzir Canvas Chart.js
+      setTimeout(function() {
+        document.querySelectorAll('canvas').forEach((canvas, idx) => {
+          try {
+            if (canvas._chartjs && canvas._chartjs.instances && canvas._chartjs.instances.length > 0) {
+              const chartInstance = canvas._chartjs.instances[0];
+              let titleUpdated = false;
+              
+              // Traduzir título do gráfico
+              if (chartInstance && chartInstance.options && chartInstance.options.plugins && chartInstance.options.plugins.title) {
+                const titleObj = chartInstance.options.plugins.title;
+                if (typeof titleObj.text === 'string') {
+                  const original = titleObj.text;
+                  if (dict[original]) {
+                    titleObj.text = dict[original];
+                    titleUpdated = true;
+                    console.log('[i18n] ✓ Título Canvas traduzido:', original, '→', dict[original]);
+                  }
+                }
+              }
+              
+              // Traduzir labels de eixos e legendas
+              if (chartInstance && chartInstance.data && chartInstance.data.labels) {
+                chartInstance.data.labels = chartInstance.data.labels.map(label => {
+                  if (typeof label === 'string' && dict[label]) {
+                    return dict[label];
+                  }
+                  return label;
+                });
+              }
+              
+              // Traduzir dataset labels
+              if (chartInstance && chartInstance.data && chartInstance.data.datasets) {
+                chartInstance.data.datasets.forEach(dataset => {
+                  if (dataset.label && dict[dataset.label]) {
+                    dataset.label = dict[dataset.label];
+                  }
+                });
+              }
+              
+              if (titleUpdated) {
+                chartInstance.update('none');
+              }
+            }
+          } catch (e) {
+            console.warn('[i18n] ⚠️ Erro ao traduzir canvas', idx, e.message);
+          }
+        });
+      }, 200);
     };
 
     // Retraduzi DOM - VERSÃO MELHORADA com FORÇA
@@ -209,15 +482,19 @@ function initSupabaseClient() {
       return fallback || key;
     };
 
-    // Função SUPER AGRESSIVA de tradução - encontra e traduz TUDO
-    window._forceTranslateEverything = function() {
+    // Tradução determinística — correspondência exata, sem cascata de setTimeout
+    let _i18nRunning = false;
+    let _i18nLastLang = null;
+    let _i18nLastDictSize = 0;
+    window._forceTranslateEverything = function(force) {
+      if (_i18nRunning) return;
       if (!i18nStrings || Object.keys(i18nStrings).length === 0) {
         console.warn('[i18n] i18nStrings vazio, abortando tradução');
         return;
       }
-      if (_currentLanguage === 'pt-BR') return; // nada a traduzir
-
-      console.log('[i18n] 🔥 Iniciando tradução AGRESSIVA de TODO conteúdo');
+      if (_currentLanguage === 'pt-BR') { _i18nRunning = false; return; } // nada a traduzir
+      _i18nRunning = true;
+      console.log('[i18n] 🔥 Iniciando tradução (lang=' + _currentLanguage + ', dict=' + Object.keys(i18nStrings).length + ')');
 
       // ── Constrói dicionário: texto_PT-BR → texto_alvo ──────────────────
       // Fontes: DYNTRAD (texto→texto) + _ptToKey (pt-BR value → key → tradução alvo)
@@ -264,13 +541,15 @@ function initSupabaseClient() {
       console.log('[i18n] Encontrados', nodes.length, 'nós de texto para traduzir');
       
       nodes.forEach(function(node) {
-        var original = node.nodeValue.trim();
-        if (!original || original.length === 0) return;
-        
-        // Procura tradução exata
-        if (allTranslations[original]) {
-          node.nodeValue = node.nodeValue.replace(original, allTranslations[original]);
-          console.log('[i18n] ✓ Traduzido:', original, '→', allTranslations[original]);
+        var raw = node.nodeValue;
+        var original = raw.trim();
+        if (!original) return;
+        var target = allTranslations[original];
+        if (!target || target === original) return;
+        // Correspondência exata segura — preserva espaços/quebras ao redor, sem regex
+        var idx = raw.indexOf(original);
+        if (idx >= 0) {
+          node.nodeValue = raw.slice(0, idx) + target + raw.slice(idx + original.length);
         }
       });
       
@@ -307,7 +586,28 @@ function initSupabaseClient() {
       });
       
       console.log('[i18n] ✅ Tradução agressiva concluída!');
+      _i18nRunning = false;
     };
+
+    // Observa novos nós (ex.: renderização de gráficos / troca de planta) e re-aplica i18n
+    (function setupI18nObserver(){
+      if (window._i18nObserver) return;
+      let _i18nObsTimer = null;
+      const obs = new MutationObserver(function(){
+        if (_currentLanguage === 'pt-BR') return;
+        if (_i18nObsTimer) return; // debounce simples
+        _i18nObsTimer = setTimeout(function(){
+          _i18nObsTimer = null;
+          try { window._forceTranslateEverything(); } catch(e){}
+        }, 150);
+      });
+      function start(){
+        if (!document.body) { setTimeout(start, 50); return; }
+        obs.observe(document.body, { childList:true, subtree:true, characterData:true });
+        window._i18nObserver = obs;
+      }
+      start();
+    })();
     
     // Função auxiliar: achata toda a estrutura de tradução em um mapa flat
     window._flattenTranslations = function(obj, prefix) {
@@ -378,6 +678,22 @@ function initSupabaseClient() {
       }
     }
 
+    // Helper numérico estrito — evita NaN nos cálculos de Cp/Cpk/Pp/Ppk
+    function _num(v) {
+      if (v === null || v === undefined || v === '') return null;
+      var n = typeof v === 'number' ? v : parseFloat(v);
+      return (typeof n === 'number' && isFinite(n)) ? n : null;
+    }
+    function _numArr(a) {
+      if (!Array.isArray(a)) return [];
+      var out = [];
+      for (var i = 0; i < a.length; i++) {
+        var n = _num(a[i]);
+        if (n !== null) out.push(n);
+      }
+      return out;
+    }
+
     // ── Helper: converter row Supabase → objeto estudo ──
     function studyFromRow(row) {
       if (!row) return null;
@@ -387,9 +703,9 @@ function initSupabaseClient() {
         partName:    row.part_name   || '',
         charCode:    row.char_code   || '',
         charName:    row.char_name   || '',
-        lsl:         row.lsl != null ? Number(row.lsl) : null,
-        usl:         row.usl != null ? Number(row.usl) : null,
-        target:      row.target != null ? Number(row.target) : null,
+        lsl:         _num(row.lsl),
+        usl:         _num(row.usl),
+        target:      _num(row.target),
         specBy:      row.spec_by || '',
         unit:        row.unit || '',
         specType:    row.spec_type || 'bilateral',
@@ -398,14 +714,14 @@ function initSupabaseClient() {
         equipment:   row.equipment || '',
         reportNum:   row.report_num || '',
         notes:       row.notes || '',
-        data:        Array.isArray(row.data_values) ? row.data_values.map(Number) : [],
-        mean:        row.mean != null ? Number(row.mean) : null,
-        stdDev:      row.std_dev != null ? Number(row.std_dev) : null,
-        cp:          row.cp != null ? Number(row.cp) : null,
-        cpk:         row.cpk != null ? Number(row.cpk) : null,
-        pp:          row.pp != null ? Number(row.pp) : null,
-        ppk:         row.ppk != null ? Number(row.ppk) : null,
-        ppmEstimated: row.ppm_estimated != null ? Number(row.ppm_estimated) : null,
+        data:        _numArr(row.data_values),
+        mean:        _num(row.mean),
+        stdDev:      _num(row.std_dev),
+        cp:          _num(row.cp),
+        cpk:         _num(row.cpk),
+        pp:          _num(row.pp),
+        ppk:         _num(row.ppk),
+        ppmEstimated: _num(row.ppm_estimated),
         status:      row.status || 'pending',
         plantId:     row.plant_id,
         userId:      row.user_id,
@@ -422,9 +738,9 @@ function initSupabaseClient() {
         part_name:     s.partName   || '',
         char_code:     s.charCode   || '',
         char_name:     s.charName   || '',
-        lsl:           s.lsl != null ? parseFloat(s.lsl) : null,
-        usl:           s.usl != null ? parseFloat(s.usl) : null,
-        target:        s.target != null ? parseFloat(s.target) : null,
+        lsl:           _num(s.lsl),
+        usl:           _num(s.usl),
+        target:        _num(s.target),
         spec_by:       s.specBy || '',
         unit:          s.unit || '',
         spec_type:     s.specType || 'bilateral',
@@ -433,14 +749,14 @@ function initSupabaseClient() {
         equipment:     s.equipment || '',
         report_num:    s.reportNum || '',
         notes:         s.notes || '',
-        data_values:   Array.isArray(s.data) ? s.data.map(Number) : [],
-        mean:          s.mean != null ? parseFloat(s.mean) : null,
-        std_dev:       s.stdDev != null ? parseFloat(s.stdDev) : null,
-        cp:            s.cp != null ? parseFloat(s.cp) : null,
-        cpk:           s.cpk != null ? parseFloat(s.cpk) : null,
-        pp:            s.pp != null ? parseFloat(s.pp) : null,
-        ppk:           s.ppk != null ? parseFloat(s.ppk) : null,
-        ppm_estimated: s.ppmEstimated != null ? parseFloat(s.ppmEstimated) : null,
+        data_values:   _numArr(s.data),
+        mean:          _num(s.mean),
+        std_dev:       _num(s.stdDev),
+        cp:            _num(s.cp),
+        cpk:           _num(s.cpk),
+        pp:            _num(s.pp),
+        ppk:           _num(s.ppk),
+        ppm_estimated: _num(s.ppmEstimated),
         status:        s.status || 'pending'
       };
       if (_currentPlant && _currentPlant.id) {
@@ -894,7 +1210,7 @@ function initSupabaseClient() {
       setTimeout(testConnection, 2000);
     })();
 
-  } catch (e) { 
+    } catch (e) { 
     console.error('[SB] ❌ ERRO CRÍTICO na inicialização:', e);
     console.error('[SB] Stack:', e.stack);
   }
@@ -1856,7 +2172,7 @@ select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%
 }
 html{font-size:14.5px}
 body{
-  font-family:'Inter','Plus Jakarta Sans',system-ui,sans-serif;
+  font-family:var(--ff);
   letter-spacing:-0.005em;
   padding-left:var(--sb-w);
 }
@@ -2058,7 +2374,7 @@ body{
   padding:22px 22px 18px;
   box-shadow:0 1px 3px rgba(15,22,35,0.04),0 4px 16px rgba(15,22,35,0.04);
   cursor:pointer;position:relative;overflow:hidden;
-  transition:transform .22s cubic-bezier(.4,0,.2,1), box-shadow .22s cubic-bezier(.4,0,.2,1);
+  transition:transform 0.22s cubic-bezier(.4,0,.2,1), box-shadow 0.22s cubic-bezier(.4,0,.2,1);
   display:flex;flex-direction:column;gap:0;
 }
 .cm-card:hover{
@@ -8862,6 +9178,54 @@ renderDashboard();
   // Expõe DYNTRAD para uso como fallback em _safeApplyI18n quando Supabase está vazio
   window._getDYNTRAD = function(lang){ return DYNTRAD[lang] || DYNTRAD['pt-BR'] || {}; };
   window._DYNTRAD = DYNTRAD;
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 🌍 INICIALIZAÇÃO DE IDIOMA — Criar seletor e aplicar idioma salvo
+  // ═══════════════════════════════════════════════════════════════════════
+  
+  // Função de inicialização
+  window._initLanguageSwitcher = function() {
+    console.log('[i18n] 🚀 Iniciando seletor de idioma...');
+    
+    if (typeof window.createLanguageSwitcher === 'function') {
+      window.createLanguageSwitcher();
+      console.log('[i18n] ✓ Seletor criado com sucesso');
+    } else {
+      console.warn('[i18n] ⚠️ createLanguageSwitcher não encontrada');
+    }
+    
+    const savedLang = localStorage.getItem('preferredLanguage') || 'pt-BR';
+    console.log('[i18n] 📍 Aplicando idioma salvo:', savedLang);
+    
+    if (typeof window._safeApplyI18n === 'function') {
+      window._safeApplyI18n(savedLang).then(() => {
+        console.log('[i18n] ✓ Idioma aplicado com sucesso');
+      }).catch(err => {
+        console.warn('[i18n] ⚠️ Erro ao aplicar idioma:', err);
+      });
+    }
+  };
+  
+  // Criar seletor assim que possível
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('[i18n] DOMContentLoaded disparado');
+      setTimeout(window._initLanguageSwitcher, 300);
+    });
+  } else {
+    // DOM já carregado
+    console.log('[i18n] DOM já está carregado');
+    setTimeout(window._initLanguageSwitcher, 300);
+  }
+  
+  // Backup: se ainda não criou depois de 3 segundos, tenta de novo
+  setTimeout(function() {
+    if (!document.getElementById('language-switcher-container')) {
+      console.warn('[i18n] ⚠️ Seletor ainda não existe, criando novamente...');
+      window._initLanguageSwitcher();
+    }
+  }, 3000);
+  
   function _translateTextNodes(){
     window._translateTextNodes = _translateTextNodes; // expõe globalmente
     var lang=_lang();
@@ -8905,7 +9269,7 @@ renderDashboard();
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',_startObs); else _startObs();
 
-  console.log('[APL+] ✓ Edição plantas/usuários + tradução dinâmica carregadas.');
+  console.log('[APL+] ✓ Edição plantas/usuários + tradução dinâmica + seletor de idioma carregados.');
 })();
 </script>
 
