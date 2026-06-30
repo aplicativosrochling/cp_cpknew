@@ -232,7 +232,7 @@ function initSupabaseClient() {
       try {
         var { data, error } = await supabaseClient
           .from('profiles')
-          .select('*, plants:plant_id(*)')
+          .select('*')
           .eq('id', userId)
           .maybeSingle();
 
@@ -241,6 +241,20 @@ function initSupabaseClient() {
           _handleAuthRecoveryIfNeeded(error);
           return null;
         }
+
+        if (data && data.plant_id) {
+          try {
+            var plantRes = await supabaseClient
+              .from('plants')
+              .select('*')
+              .eq('id', data.plant_id)
+              .maybeSingle();
+            if (!plantRes.error && plantRes.data) data.plants = plantRes.data;
+          } catch (ePlant) {
+            console.warn('[SB] Aviso ao buscar planta do perfil:', ePlant);
+          }
+        }
+
         return data;
       } catch (e) {
         console.error('[SB] ❌ Exceção perfil:', e.message);
@@ -6932,7 +6946,7 @@ renderDashboard();
 (function() {
   function loadCompanyFromSupabase() {
     if (!window._supabase) return;
-    window._supabase.from('company_settings').select('*').eq('id', 'default').single()
+    window._supabase.from('company_settings').select('*').eq('id', 'default').maybeSingle()
       .then(function(r) {
         var d = r.data;
         if (!d) return;
