@@ -13,12 +13,47 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
 
 <script>
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ⚠️  SUBSTITUA ESTES VALORES PELOS DO SEU PROJETO SUPABASE
-//     Project Settings → API → URL e anon/public key
-// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// 🚫 SUPRIMIR LOGS EXCESSIVOS APÓS 5 SEGUNDOS
+// ═══════════════════════════════════════════════════════════════════
+(function(){
+  const _origLog = console.log;
+  const _origWarn = console.warn;
+  let _logBuffer = [];
+  let _suppressAfter5s = false;
+  
+  // Após 5 segundos, começar a filtrar logs desnecessários
+  setTimeout(function(){
+    _suppressAfter5s = true;
+    _logBuffer = [];
+  }, 5000);
+  
+  console.log = function(){
+    const msg = Array.from(arguments).join(' ');
+    
+    // Sempre log: erros críticos ([SB], [FB], [i18n] iniciais)
+    if(msg.includes('[SB]') || msg.includes('[FB]') || msg.includes('[✓]') || msg.includes('[✗]') || msg.includes('[❌]')){
+      return _origLog.apply(console, arguments);
+    }
+    
+    // Após 5s, suprimir logs repetitivos de [i18n]
+    if(_suppressAfter5s && msg.includes('[i18n]')){
+      return; // ❌ silenciar
+    }
+    
+    // Resto dos logs normalmente
+    return _origLog.apply(console, arguments);
+  };
+  
+  console.warn = function(){
+    const msg = Array.from(arguments).join(' ');
+    if(_suppressAfter5s && msg.includes('[i18n]')){
+      return; // ❌ silenciar warnings de tradução
+    }
+    return _origWarn.apply(console, arguments);
+  };
+})();
+</script>
 const SUPABASE_URL = 'https://ladbighqhfjxybydcfya.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhZGJpZ2hxaGZqeHlieWRjZnlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExOTYxNTgsImV4cCI6MjA5Njc3MjE1OH0._Fdr55VlHXunQIOx_dyVLienxuj2H_D_6IpKvT8Mfe0';
 
@@ -147,279 +182,6 @@ function initSupabaseClient() {
       }
       document.documentElement.lang = languageCode;
       applyI18nToDOM();
-      setTimeout(function() { 
-        if (typeof window._translateChartTitles === 'function') {
-          window._translateChartTitles();
-        }
-      }, 150);
-    };
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 🌍 SELETOR DE IDIOMA — Adicionar UI para mudar idioma
-    // ═══════════════════════════════════════════════════════════════════════
-    window.createLanguageSwitcher = function() {
-      // Verificar se já existe
-      if (document.getElementById('language-switcher-container')) return;
-
-      const container = document.createElement('div');
-      container.id = 'language-switcher-container';
-      container.style.cssText = `
-        position: fixed;
-        top: 50%;
-        right: 12px;
-        transform: translateY(-50%);
-        z-index: 9998;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        align-items: center;
-        background: rgba(255, 255, 255, 0.98);
-        padding: 10px 8px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        font-family: 'Plus Jakarta Sans', sans-serif;
-        border: 1px solid #e0e0e0;
-        backdrop-filter: blur(10px);
-      `;
-      
-      // Estilo de impressão - esconder seletor ao imprimir
-      const style = document.createElement('style');
-      style.textContent = `
-        @media print {
-          #language-switcher-container {
-            display: none !important;
-          }
-        }
-        
-        @page {
-          margin: 0;
-        }
-      `;
-      document.head.appendChild(style);
-
-      const label = document.createElement('label');
-      label.style.cssText = `
-        font-size: 11px;
-        font-weight: 600;
-        color: #555;
-        margin: 0;
-        white-space: nowrap;
-        text-align: center;
-        letter-spacing: 0.5px;
-      `;
-      label.textContent = '🌐';
-
-      const select = document.createElement('select');
-      select.id = 'language-select';
-      select.style.cssText = `
-        padding: 6px 6px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        font-size: 11px;
-        font-family: 'Plus Jakarta Sans', sans-serif;
-        cursor: pointer;
-        background: white;
-        color: #333;
-        font-weight: 500;
-        min-width: 80px;
-      `;
-
-      // Mapeamento de idiomas disponíveis
-      const options = [
-        { value: 'pt-BR', text: 'PT 🇧🇷' },
-        { value: 'en-US', text: 'EN 🇺🇸' },
-        { value: 'es-MX', text: 'ES 🇪🇸' },
-        { value: 'it-IT', text: 'IT 🇮🇹' },
-        { value: 'de-DE', text: 'DE 🇩🇪' }
-      ];
-
-      options.forEach(opt => {
-        const option = document.createElement('option');
-        option.value = opt.value;
-        option.text = opt.text;
-        select.appendChild(option);
-      });
-
-      // Restaurar idioma salvo
-      const savedLang = localStorage.getItem('preferredLanguage') || 
-                        sessionStorage.getItem('selectedPlantLanguage') || 
-                        'pt-BR';
-      select.value = savedLang;
-      _currentLanguage = savedLang;
-
-      select.addEventListener('change', function() {
-        const lang = this.value;
-        localStorage.setItem('preferredLanguage', lang);
-        sessionStorage.setItem('selectedPlantLanguage', lang);
-        console.log('[i18n] 🌍 Idioma alterado para:', lang);
-        
-        // Aplicar tradução com delay para garantir renderização
-        setTimeout(async function() {
-          if (typeof window._safeApplyI18n === 'function') {
-            await window._safeApplyI18n(lang);
-          }
-          setTimeout(function() {
-            if (typeof window.applyI18nToDOM === 'function') {
-              window.applyI18nToDOM();
-            }
-            if (typeof window._forceTranslateEverything === 'function') {
-              window._forceTranslateEverything();
-            }
-            // Forçar tradução de títulos de gráficos
-            if (typeof window._translateChartTitles === 'function') {
-              window._translateChartTitles();
-            }
-            // Se há gráficos Chart.js, atualizar também
-            setTimeout(function() {
-              if (typeof window._updateAllCharts === 'function') {
-                window._updateAllCharts();
-              }
-            }, 200);
-          }, 100);
-        }, 50);
-      });
-
-      container.appendChild(label);
-      container.appendChild(select);
-      document.body.appendChild(container);
-      console.log('[i18n] ✓ Seletor de idioma criado (melhorado)');
-    };
-
-    // Função para atualizar TODOS os gráficos Chart.js
-    window._updateAllCharts = function() {
-      console.log('[i18n] 🔄 Atualizando todos os gráficos Chart.js...');
-      document.querySelectorAll('canvas').forEach((canvas, index) => {
-        try {
-          if (canvas._chartjs && canvas._chartjs.instances && canvas._chartjs.instances.length > 0) {
-            const chartInstance = canvas._chartjs.instances[0];
-            if (chartInstance) {
-              chartInstance.update('none'); // Update sem animação
-              console.log('[i18n] ✓ Gráfico', index, 'atualizado');
-            }
-          }
-        } catch (e) {
-          console.log('[i18n] ⚠️ Erro ao atualizar gráfico', index);
-        }
-      });
-    };
-
-    // Função para preparar página ANTES de imprimir
-    window._prepareForPrint = function() {
-      console.log('[i18n] 📄 Preparando para impressão/PDF...');
-      
-      // Garantir que todos os gráficos estão atualizados COM AS TRADUÇÕES
-      setTimeout(function() {
-        if (typeof window._translateChartTitles === 'function') {
-          window._translateChartTitles();
-        }
-        
-        // Aguardar um pouco e depois atualizar todos os charts
-        setTimeout(function() {
-          if (typeof window._updateAllCharts === 'function') {
-            window._updateAllCharts();
-          }
-          
-          // Agora sim, fazer print
-          setTimeout(function() {
-            window.print();
-          }, 500);
-        }, 300);
-      }, 100);
-    };
-
-    // Interceptar Ctrl+P e Print do navegador
-    window.addEventListener('beforeprint', function() {
-      console.log('[i18n] 🖨️ Evento beforeprint detectado');
-      if (typeof window._translateChartTitles === 'function') {
-        window._translateChartTitles();
-      }
-      if (typeof window._updateAllCharts === 'function') {
-        window._updateAllCharts();
-      }
-    });
-
-    // Função para traduzir títulos de gráficos especificamente
-    window._translateChartTitles = function() {
-      console.log('[i18n] 🎨 Traduzindo títulos de gráficos...');
-      const lang = _currentLanguage || 'pt-BR';
-      const dict = window._DYNTRAD && window._DYNTRAD[lang] ? window._DYNTRAD[lang] : {};
-
-      if (Object.keys(dict).length === 0) {
-        console.warn('[i18n] ⚠️ Dicionário vazio para idioma:', lang);
-        return;
-      }
-
-      // Traduzir todos os elementos com classe que contenha "title"
-      document.querySelectorAll('[class*="title"], [class*="Title"], [data-testid*="title"]').forEach(el => {
-        const text = el.textContent.trim();
-        if (text && dict[text]) {
-          el.textContent = dict[text];
-          console.log('[i18n] ✓ Elemento traduzido:', text, '→', dict[text]);
-        }
-      });
-
-      // Traduzir atributos title e aria-label
-      document.querySelectorAll('[title], [aria-label]').forEach(el => {
-        const titleText = el.getAttribute('title');
-        const ariaText = el.getAttribute('aria-label');
-        
-        if (titleText && dict[titleText]) {
-          el.setAttribute('title', dict[titleText]);
-        }
-        if (ariaText && dict[ariaText]) {
-          el.setAttribute('aria-label', dict[ariaText]);
-        }
-      });
-
-      // Traduzir Canvas Chart.js
-      setTimeout(function() {
-        document.querySelectorAll('canvas').forEach((canvas, idx) => {
-          try {
-            if (canvas._chartjs && canvas._chartjs.instances && canvas._chartjs.instances.length > 0) {
-              const chartInstance = canvas._chartjs.instances[0];
-              let titleUpdated = false;
-              
-              // Traduzir título do gráfico
-              if (chartInstance && chartInstance.options && chartInstance.options.plugins && chartInstance.options.plugins.title) {
-                const titleObj = chartInstance.options.plugins.title;
-                if (typeof titleObj.text === 'string') {
-                  const original = titleObj.text;
-                  if (dict[original]) {
-                    titleObj.text = dict[original];
-                    titleUpdated = true;
-                    console.log('[i18n] ✓ Título Canvas traduzido:', original, '→', dict[original]);
-                  }
-                }
-              }
-              
-              // Traduzir labels de eixos e legendas
-              if (chartInstance && chartInstance.data && chartInstance.data.labels) {
-                chartInstance.data.labels = chartInstance.data.labels.map(label => {
-                  if (typeof label === 'string' && dict[label]) {
-                    return dict[label];
-                  }
-                  return label;
-                });
-              }
-              
-              // Traduzir dataset labels
-              if (chartInstance && chartInstance.data && chartInstance.data.datasets) {
-                chartInstance.data.datasets.forEach(dataset => {
-                  if (dataset.label && dict[dataset.label]) {
-                    dataset.label = dict[dataset.label];
-                  }
-                });
-              }
-              
-              if (titleUpdated) {
-                chartInstance.update('none');
-              }
-            }
-          } catch (e) {
-            console.warn('[i18n] ⚠️ Erro ao traduzir canvas', idx, e.message);
-          }
-        });
-      }, 200);
     };
 
     // Retraduzi DOM - VERSÃO MELHORADA com FORÇA
@@ -700,13 +462,9 @@ function initSupabaseClient() {
       return {
         id:          row.id,
         partNumber:  row.part_number || '',
-        pn:          row.part_number || '',  // Alias
         partName:    row.part_name   || '',
-        pname:       row.part_name   || '',  // Alias
         charCode:    row.char_code   || '',
-        cc:          row.char_code   || '',  // Alias
         charName:    row.char_name   || '',
-        cn:          row.char_name   || '',  // Alias
         lsl:         _num(row.lsl),
         usl:         _num(row.usl),
         target:      _num(row.target),
@@ -715,11 +473,8 @@ function initSupabaseClient() {
         specType:    row.spec_type || 'bilateral',
         owner:       row.owner || '',
         studyDate:   row.study_date || '',
-        date:        row.study_date || '',  // Alias
         equipment:   row.equipment || '',
-        equip:       row.equipment || '',    // Alias
         reportNum:   row.report_num || '',
-        report:      row.report_num || '',   // Alias
         notes:       row.notes || '',
         data:        _numArr(row.data_values),
         mean:        _num(row.mean),
@@ -733,28 +488,14 @@ function initSupabaseClient() {
         plantId:     row.plant_id,
         userId:      row.user_id,
         createdAt:   row.created_at,
-        updatedAt:   row.updated_at,
-        savedAt:     row.created_at,  // Para compatibility
-        // ✅ ADICIONADO: Objeto stats com os dados calculados
-        stats: {
-          n:       row.n || 0,
-          xbar:    _num(row.mean),
-          s:       _num(row.std_dev),
-          Cp:      _num(row.cp),
-          Cpk:     _num(row.cpk),
-          Pp:      _num(row.pp),
-          Ppk:     _num(row.ppk),
-          ppm:     _num(row.ppm_estimated),
-          oos:     0  // Out of spec count
-        }
+        updatedAt:   row.updated_at
       };
     }
 
     // ── Helper: converter objeto estudo → row Supabase ──
     function studyToRow(s) {
       var row = {
-        // ❌ REMOVIDO: id é gerado automaticamente pelo Supabase (GENERATED ALWAYS AS IDENTITY)
-        // Não incluir 'id' permite que Supabase gere automaticamente
+        id:            s.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'study-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9)),
         part_number:   s.partNumber || '',
         part_name:     s.partName   || '',
         char_code:     s.charCode   || '',
@@ -6283,6 +6024,15 @@ function saveStudy(){
       if(idx>=0)local[idx]=study;else local.push(study);
       localStorage.setItem('spc_studies',JSON.stringify(local));
       toast(`Estudo "${fd.pname||'Sem nome'}" salvo no Supabase!`,'ok');
+      
+      // ✅ REFRESCAR ESTUDOS DA UI
+      if(typeof refreshStudiesFromSupabase==='function'){
+        refreshStudiesFromSupabase().catch(e=>console.warn('[FB] Refresh falhou:', e));
+      }
+      
+      // Atualizar estado de sincronização
+      const syncEl2=document.getElementById('dashSyncState');
+      if(syncEl2){syncEl2.textContent='✓ sincronizado';syncEl2.style.color='var(--ok)';}
     })
     .catch(e=>{
       console.error('[FB] Erro ao salvar:',e);
@@ -6299,7 +6049,7 @@ function saveStudyAsNew(){
   const st=calcAll(S.data,S.lsl,S.usl,S.specType);
   const newId='S'+Date.now();
   const study={
-    // ❌ REMOVIDO: id:newId (Supabase gera automaticamente)
+    id:newId,
     savedAt:new Date().toISOString(),
     ...fd,
     stats:{n:st.n,xbar:st.xbar,s:st.s,sw:st.sw,Cp:st.Cp,Cpk:st.Cpk,Pp:st.Pp,Ppk:st.Ppk,ppm:st.ppm,oos:st.oos,stable:st.stable}
@@ -6317,6 +6067,11 @@ function saveStudyAsNew(){
       const badge=document.getElementById('editingStudyBadge');
       if(badge)badge.textContent=`✏ Editando: ${fd.pname||'Sem nome'}`;
       toast(`Cópia "${fd.pname||'Sem nome'}" salva como novo estudo!`,'ok');
+      
+      // ✅ REFRESCAR ESTUDOS DA UI
+      if(typeof refreshStudiesFromSupabase==='function'){
+        refreshStudiesFromSupabase().catch(e=>console.warn('[FB] Refresh falhou:', e));
+      }
     })
     .catch(e=>{
       console.error('[FB] Erro ao salvar cópia:',e);
@@ -6324,6 +6079,29 @@ function saveStudyAsNew(){
       if(syncEl){syncEl.textContent='● erro';syncEl.style.color='var(--fail)';}
     });
 }
+
+/* ═══════════════════════════════════════════════
+   REFRESCAR ESTUDOS DO SUPABASE
+═══════════════════════════════════════════════ */
+async function refreshStudiesFromSupabase(){
+  try{
+    if(!window.FB||!window.FB.getAll) return;
+    const studies = await window.FB.getAll();
+    STUDIES = studies || [];
+    console.log('[FB] ✓ Estudos recarregados:', STUDIES.length);
+    
+    // Refrescar visualizações se ativas
+    const activePage = document.querySelector('.page.active');
+    if(activePage && activePage.id === 'page-studies') renderStudiesList();
+    if(activePage && activePage.id === 'page-dashboard') renderDashboard();
+    
+    return STUDIES;
+  }catch(e){
+    console.warn('[FB] Erro ao refrescar estudos:', e.message);
+    throw e;
+  }
+}
+window.refreshStudiesFromSupabase = refreshStudiesFromSupabase;
 
 function loadStudyToEditor(id){
   const sid=id||currentStudyId;
@@ -9199,53 +8977,18 @@ renderDashboard();
   // Expõe DYNTRAD para uso como fallback em _safeApplyI18n quando Supabase está vazio
   window._getDYNTRAD = function(lang){ return DYNTRAD[lang] || DYNTRAD['pt-BR'] || {}; };
   window._DYNTRAD = DYNTRAD;
-
+  
   // ═══════════════════════════════════════════════════════════════════════
-  // 🌍 INICIALIZAÇÃO DE IDIOMA — Criar seletor e aplicar idioma salvo
+  // ⚠️ SILENCIAR LOGS EXCESSIVOS DE TRADUÇÃO
   // ═══════════════════════════════════════════════════════════════════════
+  let _i18nLogsSuppressed = false;
+  function _suppressI18nLogs(){ _i18nLogsSuppressed = true; }
+  function _enableI18nLogs(){ _i18nLogsSuppressed = false; }
+  window._suppressI18nLogs = _suppressI18nLogs;
+  window._enableI18nLogs = _enableI18nLogs;
   
-  // Função de inicialização
-  window._initLanguageSwitcher = function() {
-    console.log('[i18n] 🚀 Iniciando seletor de idioma...');
-    
-    if (typeof window.createLanguageSwitcher === 'function') {
-      window.createLanguageSwitcher();
-      console.log('[i18n] ✓ Seletor criado com sucesso');
-    } else {
-      console.warn('[i18n] ⚠️ createLanguageSwitcher não encontrada');
-    }
-    
-    const savedLang = localStorage.getItem('preferredLanguage') || 'pt-BR';
-    console.log('[i18n] 📍 Aplicando idioma salvo:', savedLang);
-    
-    if (typeof window._safeApplyI18n === 'function') {
-      window._safeApplyI18n(savedLang).then(() => {
-        console.log('[i18n] ✓ Idioma aplicado com sucesso');
-      }).catch(err => {
-        console.warn('[i18n] ⚠️ Erro ao aplicar idioma:', err);
-      });
-    }
-  };
-  
-  // Criar seletor assim que possível
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log('[i18n] DOMContentLoaded disparado');
-      setTimeout(window._initLanguageSwitcher, 300);
-    });
-  } else {
-    // DOM já carregado
-    console.log('[i18n] DOM já está carregado');
-    setTimeout(window._initLanguageSwitcher, 300);
-  }
-  
-  // Backup: se ainda não criou depois de 3 segundos, tenta de novo
-  setTimeout(function() {
-    if (!document.getElementById('language-switcher-container')) {
-      console.warn('[i18n] ⚠️ Seletor ainda não existe, criando novamente...');
-      window._initLanguageSwitcher();
-    }
-  }, 3000);
+  // Suprimir logs por padrão
+  setTimeout(_suppressI18nLogs, 3000);
   
   function _translateTextNodes(){
     window._translateTextNodes = _translateTextNodes; // expõe globalmente
@@ -9284,13 +9027,25 @@ renderDashboard();
     if(_dynDeb) clearTimeout(_dynDeb);
     _dynDeb=setTimeout(function(){ try{ _translateTextNodes(); }catch(e){} },400);
   }
+  
+  // ✅ DEBOUNCE E CONTROLE DE MutationObserver
+  let _mutationObserverActive = false;
   function _startObs(){
+    if(_mutationObserverActive) return; // Evitar múltiplas instâncias
+    _mutationObserverActive = true;
     _scheduleDyn();
-    try{ new MutationObserver(_scheduleDyn).observe(document.body,{childList:true,subtree:true}); }catch(e){}
+    try{ 
+      const observer = new MutationObserver(function(){
+        // Debounce: não re-observar se já está rodando
+        if(_dynDeb) clearTimeout(_dynDeb);
+        _dynDeb=setTimeout(function(){ try{ _translateTextNodes(); }catch(e){} },500);
+      });
+      observer.observe(document.body,{childList:true,subtree:true}); 
+    }catch(e){}
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',_startObs); else _startObs();
 
-  console.log('[APL+] ✓ Edição plantas/usuários + tradução dinâmica + seletor de idioma carregados.');
+  console.log('[APL+] ✓ Edição plantas/usuários + tradução dinâmica carregadas.');
 })();
 </script>
 
