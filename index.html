@@ -238,11 +238,13 @@ function initSupabaseClient() {
 
         if (error) {
           console.error('[SB] ❌ Erro perfil:', error.message);
+          _handleAuthRecoveryIfNeeded(error);
           return null;
         }
         return data;
       } catch (e) {
         console.error('[SB] ❌ Exceção perfil:', e.message);
+        _handleAuthRecoveryIfNeeded(e);
         return null;
       }
     }
@@ -257,9 +259,31 @@ function initSupabaseClient() {
         return (data || []).map(function(x) { return x.role; });
       } catch (e) {
         console.warn('[SB] Erro ao buscar roles:', e);
+        _handleAuthRecoveryIfNeeded(e);
         return [];
       }
     }
+
+    // Se a sessão estiver com token de refresh inválido/expirado, força logout
+    // limpo e mostra a tela de login novamente, em vez de deixar o app
+    // travado num estado "logado pela metade" (sem perfil/roles carregados).
+    var _authRecoveryTriggered = false;
+    function _handleAuthRecoveryIfNeeded(e) {
+      try {
+        var msg = ((e && e.message) || '').toLowerCase();
+        var isAuthIssue = msg.indexOf('refresh token') >= 0 ||
+                           msg.indexOf('jwt') >= 0 ||
+                           msg.indexOf('invalid refresh') >= 0;
+        if (isAuthIssue && !_authRecoveryTriggered) {
+          _authRecoveryTriggered = true;
+          console.warn('[SB] ⚠️ Sessão inválida detectada. Forçando novo login...');
+          supabaseClient.auth.signOut().catch(function() {}).then(function() {
+            setTimeout(function() { window.location.reload(); }, 300);
+          });
+        }
+      } catch (e2) {}
+    }
+
 
     // ============================================================
     // HELPERS DE ESTUDOS
@@ -714,6 +738,11 @@ function initSupabaseClient() {
         var { data: { session }, error } = await supabaseClient.auth.getSession();
         if (error) {
           console.error('[SB] ❌ Erro sessão:', error.message);
+          try { await supabaseClient.auth.signOut(); } catch (e2) {}
+          var gateErr = document.getElementById('authGate');
+          var appElErr = document.querySelector('.app');
+          if (gateErr) { gateErr.style.display = 'flex'; gateErr.classList.remove('hidden'); }
+          if (appElErr) { appElErr.style.display = 'none'; appElErr.classList.add('hidden'); }
           return;
         }
 
