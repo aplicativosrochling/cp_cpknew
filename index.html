@@ -1885,40 +1885,112 @@ body {
 }
 
 @media print {
-  @page { size: A4 portrait; margin: 0; }
-  @page:first { margin: 0; }
-  html, body { padding: 10mm 12mm 12mm 12mm !important; }
+  @page { size: A4 portrait; margin: 10mm; }
+  @page:first { margin: 10mm; }
+
+  html, body {
+    padding: 0 !important; margin: 0 !important;
+    background: #fff !important; color: #000 !important;
+    font-size: 11px !important;
+    font-family: 'Segoe UI', 'Inter', system-ui, sans-serif !important;
+  }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  .no-print,
   .topbar, .sidebar, .topbar-right, .nav-tab, .topbar-tabs,
   .btn, .itabs, .itab-pane, .dropzone, .data-bar, .chips-scroll,
   .oos-alert, .dec-ctrl, .top-clock, #page-studies, .modal-bg,
   .toast, #oosAlert, .card-hd-extra, .study-card-actions, .studies-page,
   #dataTableWrap, .dash-view-toggle, #cmDashView, #classicDashView,
-  .cm-modal-bg, #page-dashboard { display: none !important; }
+  .cm-modal-bg, #page-dashboard, #page-admin, #page-admin-plants { display: none !important; }
+
   .app, .analysis-layout, .content { display: block !important; width: 100% !important; padding: 0 !important; }
-  #printPageHeader { display: block !important; padding: 5mm 0 4mm 0 !important; margin-bottom: 4mm !important; border-bottom: 2.5px solid #1565C0 !important; }
-  .study-header { display: block !important; margin: 0 0 3mm 0 !important; padding: 6px 10px !important; background: #f8f9fe !important; box-shadow: none !important; border: 1px solid #c8cee0 !important; border-left: 3.5px solid #1565C0 !important; border-radius: 4px !important; }
-  .kpi-strip { display: grid !important; grid-template-columns: repeat(6, 1fr) !important; gap: 3px !important; }
-  .charts-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 3mm !important; }
-  .chart-card { display: block !important; padding: 6px 8px !important; background: #fff !important; box-shadow: none !important; border: 1px solid #d0d5e8 !important; border-radius: 4px !important; overflow: hidden !important; page-break-inside: avoid !important; break-inside: avoid !important; box-sizing: border-box !important; max-width: 100% !important; }
+
+  #printPageHeader {
+    display: block !important; padding: 0 0 3mm 0 !important; margin-bottom: 3mm !important;
+    border-bottom: 2px solid #1565C0 !important;
+    page-break-after: avoid !important; break-after: avoid !important;
+  }
+
+  .study-header {
+    display: block !important; margin: 0 0 2mm 0 !important; padding: 5px 9px !important;
+    background: #fff !important; box-shadow: none !important;
+    border: 1px solid #dee2e6 !important; border-left: 3px solid #1565C0 !important;
+    border-radius: 4px !important; font-size: 9px !important;
+    page-break-inside: avoid !important; break-inside: avoid !important;
+  }
+
+  .kpi-strip {
+    display: grid !important; grid-template-columns: repeat(6, 1fr) !important; gap: 2px !important;
+    page-break-inside: avoid !important; break-inside: avoid !important;
+    margin-bottom: 2mm !important;
+  }
+  .kpi { border: 1px solid #dee2e6 !important; box-shadow: none !important; background: #fff !important; padding: 5px 6px !important; }
+  .kpi-tag { font-size: 6.5px !important; margin-bottom: 1px !important; }
+  .kpi-val { font-size: 15px !important; margin-bottom: 1px !important; }
+  .kpi-sub { font-size: 6.5px !important; margin-bottom: 3px !important; }
+
+  .cpill, .unilateral-badge, .kpi-badge { box-shadow: none !important; background-image: none !important; padding: 1px 5px !important; font-size: 7px !important; }
+  .cpill-g { background: #e6f4ea !important; color: #1e7e34 !important; border: 1px solid #b7ddc0 !important; }
+  .cpill-r { background: #fbe9e7 !important; color: #b0281c !important; border: 1px solid #f0b8b1 !important; }
+  .cpill-a { background: #fff4e0 !important; color: #a15c00 !important; border: 1px solid #f0d49b !important; }
+  .cpill-b { background: #e8f0fe !important; color: #174ea6 !important; border: 1px solid #b6cdf3 !important; }
+
+  .charts-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 2mm !important; }
+  .chart-card {
+    display: block !important; padding: 4px 6px !important; background: #fff !important;
+    box-shadow: none !important; border: 1px solid #dee2e6 !important; border-radius: 4px !important;
+    overflow: hidden !important; box-sizing: border-box !important; max-width: 100% !important;
+    page-break-inside: avoid !important; break-inside: avoid !important;
+  }
+  .chart-hd { display: flex !important; flex-wrap: wrap !important; margin-bottom: 4px !important; }
+  .chart-title { font-size: 8.5px !important; }
+  .chart-pills { display: flex !important; flex-wrap: wrap !important; gap: 2px !important; }
+
   .chart-area {
-    overflow: hidden !important;
+    width: 100% !important;
     max-width: 100% !important;
-    /* CRÍTICO: sem isso, a altura inline em px (calculada em JS para a
-       largura de tela cheia) permanece intacta enquanto a largura do
-       card encolhe pela metade no layout de impressão em 2 colunas.
-       O Chart.js recalcula o gráfico para essa nova proporção
-       (muito estreita + muito alta), fazendo textos/eixos aparecerem
-       gigantes e os pontos/barras ficarem espremidos. Forçar uma
-       altura fixa e proporcional aqui resolve a distorção. */
     height: 46mm !important;
     max-height: 46mm !important;
+    overflow: hidden !important;
+    position: relative !important;
   }
   .chart-area canvas { max-width: 100% !important; width: 100% !important; height: 100% !important; }
-  .study-header, .kpi-strip { page-break-inside: avoid !important; break-inside: avoid !important; }
-  .stats-wrap { display: block !important; border: 1px solid #c8cee0 !important; border-radius: 4px !important; margin-top: 3mm !important; }
-  .print-data-section { display: block !important; padding: 6px 10px !important; background: #fff !important; border: 1px solid #c8cee0 !important; border-top: none !important; border-radius: 0 0 4px 4px !important; }
-  .print-footer { display: flex !important; justify-content: space-between !important; padding: 4mm 0 0 0 !important; margin-top: 4mm !important; border-top: 1.5px solid #c8cee0 !important; font-size: 7px !important; color: #7a82a0 !important; }
+
+  .stats-wrap {
+    display: block !important; border: 1px solid #dee2e6 !important; border-radius: 4px !important;
+    margin-top: 2mm !important; background: #fff !important;
+  }
+  .stats-wrap table { border-collapse: collapse !important; width: 100% !important; }
+  .stats-wrap th, .stats-wrap td { border: 1px solid #dee2e6 !important; }
+  .stats-wrap tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+  .stats-wrap tr.sec-hd { background: #f1f3f5 !important; font-weight: 700 !important; }
+  .stats-wrap tr.sec-hd-noprint { display: none !important; }
+  /* Linhas e fontes compactas: sem isso, o padding pensado para tela
+     (8-9px) deixa cada linha alta e quebra a tabela em várias páginas
+     bem antes de encher a largura da folha. */
+  .stats-wrap thead th { padding: 2px 5px !important; font-size: 6.5px !important; }
+  .stats-wrap tbody td { padding: 1.5px 5px !important; font-size: 7.5px !important; line-height: 1.25 !important; }
+  .stats-wrap td.mono { font-size: 7.5px !important; }
+  .stats-wrap td.ref { font-size: 7px !important; }
+  .stats-wrap .sec-hd td { padding: 1.5px 5px !important; font-size: 6.5px !important; }
+  .stats-wrap .badge { padding: 1px 5px !important; font-size: 6.5px !important; }
+
+  /* Histograma + Curva Normal em destaque: ocupa a largura toda e fica
+     maior que os demais gráficos na impressão, sem deixar espaço em
+     branco excessivo sobrando na página */
+  .chart-card:has(#aHist) { grid-column: 1 / -1 !important; }
+  .chart-card:has(#aHist) .chart-area { height: 68mm !important; max-height: 68mm !important; }
+
+  .print-data-section {
+    display: block !important; padding: 5px 9px !important; background: #fff !important;
+    border: 1px solid #dee2e6 !important; border-top: none !important; border-radius: 0 0 4px 4px !important;
+  }
+  .print-footer {
+    display: flex !important; justify-content: space-between !important; padding: 2mm 0 0 0 !important;
+    margin-top: 2mm !important; border-top: 1px solid #dee2e6 !important; font-size: 6.5px !important; color: #6c757d !important;
+    page-break-inside: avoid !important;
+  }
 }
 
 /* ============================================================
@@ -4388,7 +4460,7 @@ function updateStatsTable(st) {
   var row = function(p, v, ref, interp, status) {
     return '<tr><td>' + p + '</td><td class="mono">' + v + '</td><td class="ref">' + ref + '</td><td style="font-size:11px;color:var(--t1)">' + interp + '</td><td>' + status + '</td></tr>';
   };
-  var sec = function(lbl) { return '<tr class="sec-hd"><td colspan="5">' + lbl + '</td></tr>'; };
+  var sec = function(lbl, printHide) { return '<tr class="sec-hd' + (printHide ? ' sec-hd-noprint' : '') + '"><td colspan="5">' + lbl + '</td></tr>'; };
 
   var pn = document.getElementById('iPN').value || '—';
   var cn = document.getElementById('iCharName').value || '—';
@@ -4407,7 +4479,7 @@ function updateStatsTable(st) {
   R.push(row('USL', usl != null ? f(usl) : '—', '—', 'Limite superior de especificação', usl != null ? mkBadge('Definido', 'ok') : mkBadge('Não definido', 'dim')));
   if (lsl != null && usl != null) R.push(row('Tolerância Total', f(usl - lsl), '—', 'USL − LSL', mkBadge('Calculado', 'info')));
 
-  R.push(sec('📊 Estatísticas Descritivas'));
+  R.push(sec('📊 Estatísticas Descritivas', true));
   R.push(row('Média (x̄)', f(st.xbar), '—', 'Centro do processo', mkBadge('Calculado', 'info')));
   R.push(row('Mediana', f(st.n % 2 === 0 ? (st.mn + st.mx) / 2 : st.mx), '—', 'Valor central da amostra', mkBadge('Calculado', 'info')));
   R.push(row('Desvio Padrão (s)', f(st.s), '—', 'Variabilidade global do processo', mkBadge('Calculado', 'info')));
@@ -4418,7 +4490,7 @@ function updateStatsTable(st) {
   R.push(row('Assimetria (Sk)', f(st.sk, 4), '≈ 0 (Normal)', 'Medida de simetria da distribuição', st.normOK ? mkBadge('OK', 'ok') : mkBadge('Verificar', 'warn')));
   R.push(row('Curtose (Ku)', f(st.ku, 4), '≈ 0 (Normal)', 'Medida de achatamento da distribuição', st.normOK ? mkBadge('OK', 'ok') : mkBadge('Verificar', 'warn')));
 
-  R.push(sec('📈 Índices de Capabilidade — AIAG / ISO 22514'));
+  R.push(sec('📈 Índices de Capabilidade — AIAG / ISO 22514', true));
   R.push(row('Cp', st.Cp != null ? f(st.Cp) : 'N/A', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)', 'Capabilidade Potencial (Largura da tolerância / 6σ̂)', capBadge(st.Cp)));
   R.push(row('Cpk', st.Cpk != null ? f(st.Cpk) : '—', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)', 'Capabilidade Real (centramento + variabilidade)', capBadge(st.Cpk)));
   R.push(row('Pp', st.Pp != null ? f(st.Pp) : 'N/A', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)', 'Performance Potencial (Largura da tolerância / 6s)', capBadge(st.Pp)));
@@ -5666,13 +5738,16 @@ function printReport() {
     (unit ? '  ·  ' + unit : '') +
     (oosCount > 0 ? '  ·  ⚠ ' + oosCount + ' fora de especificação' : '  ·  ✓ Todos dentro da especificação');
 
+  // Tabela Nº/Valor em pares — mesmo formato do relatório de referência
+  // (DR1.pdf): 5 pares "Nº | Valor" lado a lado, preenchendo a largura
+  // da folha A4, com cabeçalho e bordas finas (sem gradiente).
   var COLS = n <= 50 ? 5 : n <= 100 ? 6 : n <= 150 ? 7 : n <= 200 ? 8 : n <= 300 ? 9 : 10;
   var rowsPerCol = Math.ceil(n / COLS);
 
   var thead = '<thead><tr>';
   for (var c = 0; c < COLS; c++) {
-    thead += '<th style="background:linear-gradient(180deg,#e8ecf8,#dfe4f4);color:#5a6280;font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:3px 5px;border:1px solid #c8cee0;text-align:center">Nº</th>';
-    thead += '<th style="background:linear-gradient(180deg,#e8ecf8,#dfe4f4);color:#2d3655;font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:3px 8px;border:1px solid #c8cee0;text-align:right">Valor ' + (unit ? '(' + unit + ')' : '') + '</th>';
+    thead += '<th style="background:#eef1f7;color:#5a6280;font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:3px 5px;border:1px solid #dee2e6;text-align:center">Nº</th>';
+    thead += '<th style="background:#eef1f7;color:#2d3655;font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:3px 8px;border:1px solid #dee2e6;text-align:right">Valor ' + (unit ? '(' + unit + ')' : '') + '</th>';
   }
   thead += '</tr></thead>';
 
@@ -5684,14 +5759,14 @@ function printReport() {
       if (idx < n) {
         var v = data[idx];
         var out = isOut(v);
-        var numBg = out ? '#fee2e2' : '#f7f8fc';
-        var valBg = out ? '#fee2e2' : (row % 2 === 0 ? '#fff' : '#f7f8fc');
-        var valCol = out ? '#dc2626' : '#0f1623';
-        var numCol = out ? '#dc2626' : '#9099b8';
-        tbody += '<td style="background:' + numBg + ';color:' + numCol + ';font-size:8px;font-family:\'Geist Mono\',monospace;padding:2.5px 5px;border:1px solid #e3e6f0;text-align:center;white-space:nowrap">' + String(idx + 1).padStart(3, '0') + '</td>';
-        tbody += '<td style="background:' + valBg + ';color:' + valCol + ';font-size:8.5px;font-family:\'Geist Mono\',monospace;font-weight:' + (out ? '700' : '400') + ';padding:2.5px 8px;border:1px solid #e3e6f0;text-align:right;white-space:nowrap">' + v.toFixed(DEC) + (out ? ' ⚠' : '') + '</td>';
+        var numBg = out ? '#fbe9e7' : '#f7f8fc';
+        var valBg = out ? '#fbe9e7' : (row % 2 === 0 ? '#fff' : '#f7f8fc');
+        var valCol = out ? '#b0281c' : '#0f1623';
+        var numCol = out ? '#b0281c' : '#9099b8';
+        tbody += '<td style="background:' + numBg + ';color:' + numCol + ';font-size:8px;font-family:\'Geist Mono\',monospace;padding:2.5px 5px;border:1px solid #eef0f4;text-align:center;white-space:nowrap">' + String(idx + 1).padStart(3, '0') + '</td>';
+        tbody += '<td style="background:' + valBg + ';color:' + valCol + ';font-size:8.5px;font-family:\'Geist Mono\',monospace;font-weight:' + (out ? '700' : '400') + ';padding:2.5px 8px;border:1px solid #eef0f4;text-align:right;white-space:nowrap">' + v.toFixed(DEC) + (out ? ' ⚠' : '') + '</td>';
       } else {
-        tbody += '<td style="border:1px solid #eef0f7;background:#fafafa"></td><td style="border:1px solid #eef0f7;background:#fafafa"></td>';
+        tbody += '<td style="border:1px solid #eef0f4;background:#fafafa"></td><td style="border:1px solid #eef0f4;background:#fafafa"></td>';
       }
     }
     tbody += '</tr>';
@@ -5701,8 +5776,8 @@ function printReport() {
   pdTableWrap.innerHTML = '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' + thead + tbody + '</table>';
   pdTableWrap.innerHTML +=
     '<div style="margin-top:5px;display:flex;gap:12px;font-size:8px;color:#5a6280">' +
-    '<span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;background:#fff;border:1px solid #d0d5e8;border-radius:2px"></span>Dentro da especificação</span>' +
-    '<span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:2px"></span>Fora de especificação ⚠</span></div>';
+    '<span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;background:#fff;border:1px solid #dee2e6;border-radius:2px"></span>Dentro da especificação</span>' +
+    '<span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;background:#fbe9e7;border:1px solid #f0b8b1;border-radius:2px"></span>Fora de especificação ⚠</span></div>';
 
   document.getElementById('printPageHeader').style.display = 'block';
   pdSection.style.display = 'block';
