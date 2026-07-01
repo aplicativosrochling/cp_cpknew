@@ -1283,6 +1283,43 @@ select { cursor: pointer; appearance: none; background-image: url("data:image/sv
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
 
 /* ============================================================
+   COMPANY BRANDING MODAL ("Empresa")
+   ============================================================ */
+.branding-modal {
+  position: fixed; inset: 0; background: rgba(15, 22, 35, 0.5);
+  backdrop-filter: blur(4px); z-index: 900;
+  display: none; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.branding-modal.open { display: flex; }
+.branding-modal-box {
+  background: var(--s0); border: 1px solid var(--s3); border-radius: var(--r3);
+  padding: 24px; box-shadow: 0 24px 80px rgba(15, 22, 35, 0.25);
+  max-width: 520px; width: 100%; max-height: 88vh; overflow-y: auto;
+}
+.branding-modal-title { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: var(--t0); }
+.branding-row { margin-bottom: 12px; }
+.branding-row.full { margin-bottom: 12px; }
+.branding-label { font-size: 12px; font-weight: 600; color: var(--t2); margin-bottom: 5px; }
+.branding-input {
+  width: 100%; padding: 9px 11px; border: 1px solid var(--s3); border-radius: 8px;
+  font-size: 13px; font-family: inherit; color: var(--t0); background: var(--s0);
+  box-sizing: border-box;
+}
+.branding-input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-l); }
+.branding-textarea { min-height: 64px; resize: vertical; }
+#brandingLogoFile { display: block; margin-bottom: 8px; font-size: 12px; }
+.branding-logo-preview {
+  width: 100%; min-height: 64px; border: 1.5px dashed var(--s4); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; padding: 10px;
+  margin-bottom: 8px; background: var(--s1); box-sizing: border-box;
+}
+.branding-logo-preview img { max-height: 56px; max-width: 100%; object-fit: contain; }
+.branding-logo-preview span { color: var(--t3); font-size: 12px; }
+.branding-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+.branding-actions .btn-danger { margin-right: auto; }
+
+/* ============================================================
    MODERN UI: LEFT SIDEBAR
    ============================================================ */
 :root {
@@ -1913,22 +1950,45 @@ body {
   }
 
   .study-header {
-    display: block !important; margin: 0 0 2mm 0 !important; padding: 5px 9px !important;
+    display: block !important; margin: 0 0 1.5mm 0 !important; padding: 4px 8px !important;
     background: #fff !important; box-shadow: none !important;
     border: 1px solid #dee2e6 !important; border-left: 3px solid #1565C0 !important;
     border-radius: 4px !important; font-size: 9px !important;
     page-break-inside: avoid !important; break-inside: avoid !important;
   }
+  .study-header-top {
+    margin-bottom: 3px !important; padding-bottom: 3px !important;
+  }
+  .study-status-dot { width: 7px !important; height: 7px !important; box-shadow: 0 0 0 2px var(--s3) !important; }
+  .study-name { font-size: 10.5px !important; }
+  .study-meta-grid { gap: 3px 10px !important; }
+  .study-meta-label { font-size: 7px !important; margin-bottom: 0 !important; }
+  .study-meta-value { font-size: 9px !important; }
 
   .kpi-strip {
     display: grid !important; grid-template-columns: repeat(6, 1fr) !important; gap: 2px !important;
     page-break-inside: avoid !important; break-inside: avoid !important;
-    margin-bottom: 2mm !important;
+    margin-bottom: 1.5mm !important;
   }
-  .kpi { border: 1px solid #dee2e6 !important; box-shadow: none !important; background: #fff !important; padding: 5px 6px !important; }
+  .kpi { border: 1px solid #dee2e6 !important; box-shadow: none !important; background: #fff !important; padding: 4px 5px !important; }
   .kpi-tag { font-size: 6.5px !important; margin-bottom: 1px !important; }
-  .kpi-val { font-size: 15px !important; margin-bottom: 1px !important; }
-  .kpi-sub { font-size: 6.5px !important; margin-bottom: 3px !important; }
+  .kpi-val { font-size: 14px !important; margin-bottom: 1px !important; }
+  .kpi-sub { font-size: 6.5px !important; margin-bottom: 2px !important; }
+  .kpi-track { height: 2px !important; }
+  .kpi-divider { margin: 3px 0 !important; }
+
+  .banner {
+    padding: 6px 10px !important; gap: 8px !important;
+    box-shadow: none !important; border-radius: 4px !important;
+    page-break-inside: avoid !important; break-inside: avoid !important;
+    margin-bottom: 1.5mm !important;
+  }
+  .banner-icon { font-size: 16px !important; }
+  .banner-title { font-size: 10px !important; margin-bottom: 1px !important; }
+  .banner-desc { font-size: 8px !important; }
+  .banner-metrics { gap: 10px !important; }
+  .bm-val { font-size: 13px !important; }
+  .bm-lbl { font-size: 7px !important; }
 
   .cpill, .unilateral-badge, .kpi-badge { box-shadow: none !important; background-image: none !important; padding: 1px 5px !important; font-size: 7px !important; }
   .cpill-g { background: #e6f4ea !important; color: #1e7e34 !important; border: 1px solid #b7ddc0 !important; }
@@ -1936,16 +1996,17 @@ body {
   .cpill-a { background: #fff4e0 !important; color: #a15c00 !important; border: 1px solid #f0d49b !important; }
   .cpill-b { background: #e8f0fe !important; color: #174ea6 !important; border: 1px solid #b6cdf3 !important; }
 
-  .charts-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 2mm !important; }
+  .charts-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 1.5mm !important; }
   .chart-card {
-    display: block !important; padding: 4px 6px !important; background: #fff !important;
+    display: block !important; padding: 3px 5px !important; background: #fff !important;
     box-shadow: none !important; border: 1px solid #dee2e6 !important; border-radius: 4px !important;
     overflow: hidden !important; box-sizing: border-box !important; max-width: 100% !important;
     page-break-inside: avoid !important; break-inside: avoid !important;
   }
-  .chart-hd { display: flex !important; flex-wrap: wrap !important; margin-bottom: 4px !important; }
+  .chart-hd { display: flex !important; flex-wrap: wrap !important; margin-bottom: 3px !important; }
   .chart-title { font-size: 8.5px !important; }
   .chart-pills { display: flex !important; flex-wrap: wrap !important; gap: 2px !important; }
+  .chart-note { font-size: 7px !important; margin-top: 2px !important; }
 
   .chart-area {
     width: 100% !important;
@@ -1980,16 +2041,19 @@ body {
      maior que os demais gráficos na impressão, sem deixar espaço em
      branco excessivo sobrando na página */
   .chart-card:has(#aHist) { grid-column: 1 / -1 !important; }
-  .chart-card:has(#aHist) .chart-area { height: 68mm !important; max-height: 68mm !important; }
+  .chart-card:has(#aHist) .chart-area { height: 56mm !important; max-height: 56mm !important; }
 
   /* Indicador Cpk / Gauge: removido da impressão a pedido — não agrega
      informação além do KPI Cpk já exibido no topo do relatório. */
   #chartCardGauge { display: none !important; }
 
   /* Gráfico I — Valores Individuais: ocupa a largura toda e fica maior
-     na impressão, ocupando o espaço que sobrou com a remoção do gauge. */
+     na impressão, ocupando o espaço que sobrou com a remoção do gauge.
+     Altura reduzida (junto com o cabeçalho/banner mais compactos acima)
+     para que Histograma + Gráfico I caibam inteiros na página 1, sem
+     deixar espaço em branco no rodapé da página. */
   #chartCardIC { grid-column: 1 / -1 !important; }
-  #chartCardIC .chart-area { height: 68mm !important; max-height: 68mm !important; }
+  #chartCardIC .chart-area { height: 56mm !important; max-height: 56mm !important; }
 
   .print-data-section {
     display: block !important; padding: 5px 9px !important; background: #fff !important;
@@ -2886,8 +2950,8 @@ body {
 <!-- ============================================================ -->
 <!-- BRANDING MODAL -->
 <!-- ============================================================ -->
-<div id="brandingModal" class="branding-modal" style="display:none">
-  <div class="branding-modal" style="max-width:520px;margin:16px">
+<div id="brandingModal" class="branding-modal">
+  <div class="branding-modal-box">
     <div class="branding-modal-title">🏢 Identidade da Empresa (Impressão / PDF)</div>
     <div class="branding-row full">
       <div class="branding-label">Logotipo</div>
