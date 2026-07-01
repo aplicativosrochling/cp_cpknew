@@ -1769,12 +1769,90 @@ body {
 .apl-uact button:hover { background: #eef2ff; border-color: #a5b4fc; color: #4338ca; }
 .apl-uact button.danger:hover { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
 
+/* ============================================================
+   ADMIN PLANT PICKER — "Director Console" dark theme
+   ============================================================ */
+#page-admin-plants.active {
+  background: radial-gradient(ellipse at top, #0f2744 0%, #0a1830 55%, #060d1c 100%) !important;
+}
+.aplg-wrap { max-width: 900px; margin: 0 auto; padding: 0 0 60px; font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif; }
+.aplg-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 22px 24px; border-bottom: 1px solid rgba(148, 163, 184, .14);
+  background: rgba(15, 23, 42, .35); backdrop-filter: blur(6px);
+}
+.aplg-brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.aplg-brand-icon {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  display: flex; align-items: center; justify-content: center; font-size: 22px;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, .35);
+}
+.aplg-brand-name { font-size: 17px; font-weight: 800; color: #f1f5f9; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aplg-brand-sub { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #7c93b8; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aplg-header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.aplg-count-badge {
+  display: flex; align-items: center; gap: 8px; background: rgba(59, 130, 246, .12);
+  border: 1px solid rgba(59, 130, 246, .3); color: #93c5fd; font-size: 13px; font-weight: 700;
+  padding: 9px 16px; border-radius: 30px; white-space: nowrap;
+}
+.aplg-count-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: #60a5fa; box-shadow: 0 0 0 3px rgba(96, 165, 250, .25); }
+.aplg-logout {
+  background: rgba(148, 163, 184, .12); border: 1px solid rgba(148, 163, 184, .25); color: #e2e8f0;
+  font-size: 13px; font-weight: 700; padding: 9px 18px; border-radius: 30px; cursor: pointer; transition: all .2s ease;
+}
+.aplg-logout:hover { background: rgba(148, 163, 184, .2); }
+
+.aplg-hero { text-align: center; padding: 56px 24px 28px; }
+.aplg-hero h1 { font-size: 34px; font-weight: 800; color: #f8fafc; margin: 0; letter-spacing: -.02em; }
+.aplg-hero p { font-size: 14.5px; color: #94a3b8; margin: 10px 0 0; font-weight: 500; }
+
+.aplg-legend { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 0 24px 32px; }
+.aplg-legend-item {
+  display: flex; align-items: center; gap: 8px; background: rgba(148, 163, 184, .08);
+  border: 1px solid rgba(148, 163, 184, .16); color: #cbd5e1; font-size: 12.5px; font-weight: 600;
+  padding: 8px 15px; border-radius: 30px;
+}
+.aplg-legend-item .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.aplg-legend-item .dot.ok { background: #34d399; box-shadow: 0 0 0 3px rgba(52, 211, 153, .18); }
+.aplg-legend-item .dot.warn { background: #fbbf24; box-shadow: 0 0 0 3px rgba(251, 191, 36, .18); }
+.aplg-legend-item .dot.fail { background: #f87171; box-shadow: 0 0 0 3px rgba(248, 113, 113, .18); }
+
+.aplg-list { display: flex; flex-direction: column; gap: 14px; padding: 0 24px; }
+.aplg-card {
+  display: flex; align-items: center; gap: 18px; text-align: left; width: 100%;
+  background: rgba(30, 41, 59, .55); border: 1px solid rgba(148, 163, 184, .14); border-radius: 18px;
+  padding: 18px 22px; cursor: pointer; transition: all .22s ease; color: inherit; font-family: inherit;
+}
+.aplg-card:hover { background: rgba(51, 65, 85, .65); border-color: rgba(96, 165, 250, .35); transform: translateY(-2px); }
+.aplg-flag {
+  width: 52px; height: 52px; border-radius: 14px; flex-shrink: 0; overflow: hidden; position: relative;
+  display: flex; align-items: center; justify-content: center; font-size: 26px;
+  background: rgba(148, 163, 184, .1); box-shadow: 0 4px 10px rgba(0, 0, 0, .25);
+}
+.aplg-flag .aplg-code-chip {
+  position: absolute; top: -4px; left: -4px; width: 20px; height: 20px; border-radius: 6px;
+  background: #1d4ed8; color: #fff; font-size: 10px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center; border: 2px solid #0a1830;
+}
+.aplg-body { flex: 1; min-width: 0; }
+.aplg-name { font-size: 17px; font-weight: 800; color: #f1f5f9; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aplg-meta { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #94a3b8; font-weight: 600; margin-top: 3px; }
+.aplg-meta .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.aplg-meta .dot.ok { background: #34d399; }
+.aplg-meta .dot.warn { background: #fbbf24; }
+.aplg-meta .dot.fail { background: #f87171; }
+.aplg-arrow { font-size: 20px; color: #64748b; flex-shrink: 0; transition: transform .2s ease; }
+.aplg-card:hover .aplg-arrow { transform: translateX(4px); color: #93c5fd; }
+.aplg-empty { text-align: center; padding: 60px 20px; color: #64748b; font-size: 14px; }
+
 .adm-tab {
   background: none; border: none; padding: 10px 16px; font-size: 13px; font-weight: 600;
   color: var(--t2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
 }
 .adm-tab:hover { color: var(--t1); }
 .adm-tab-active { color: var(--blue); border-bottom-color: var(--blue); }
+
 
 .toast {
   max-width: 420px;
@@ -2514,6 +2592,46 @@ body {
   <!-- ========================================================== -->
   <!-- PAGE: ADMIN -->
   <!-- ========================================================== -->
+  <!-- ========================================================== -->
+  <!-- PAGE: ADMIN PLANT PICKER (Director Console) -->
+  <!-- ========================================================== -->
+  <div class="page" id="page-admin-plants">
+    <div class="aplg-wrap">
+      <div class="aplg-header">
+        <div class="aplg-brand">
+          <div class="aplg-brand-icon">🏭</div>
+          <div style="min-width:0">
+            <div class="aplg-brand-name" id="aplgCompanyName">Röchling Automotive</div>
+            <div class="aplg-brand-sub">Global Operations · Director Console</div>
+          </div>
+        </div>
+        <div class="aplg-header-right">
+          <span class="aplg-count-badge"><span class="dot"></span><span id="aplStatPlants">0</span>&nbsp;plantas</span>
+          <button class="aplg-logout" onclick="if(confirm('Sair?')) window.AUTH.logout()">Sair</button>
+        </div>
+      </div>
+
+      <div class="aplg-hero">
+        <h1>Selecione uma unidade</h1>
+        <p>Escolha uma planta para acessar o sistema</p>
+      </div>
+
+      <div class="aplg-legend">
+        <span class="aplg-legend-item"><span class="dot ok"></span>Processo capaz</span>
+        <span class="aplg-legend-item"><span class="dot warn"></span>Monitorar</span>
+        <span class="aplg-legend-item"><span class="dot fail"></span>Não capaz</span>
+      </div>
+
+      <div class="aplg-list" id="aplPlantGrid"></div>
+
+      <!-- Elementos ocultos mantidos por compatibilidade com aplRenderGrid/aplLoadUsers -->
+      <div style="display:none">
+        <span id="kpiPlantCount"></span><span id="kpiCountryCount"></span><span id="kpiLanguageCount"></span>
+        <span id="aplStatUsers"></span><select id="aplQuickPlant"></select><tbody id="aplUserRows"></tbody>
+      </div>
+    </div>
+  </div>
+
   <div class="page" id="page-admin">
     <div style="max-width:1200px;margin:0 auto;padding:24px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
@@ -5501,8 +5619,42 @@ function importBackup(input) {
 
 /* ============================================================
    PRINT
+   ============================================================
+   O botão "Imprimir" agora reutiliza o MESMO motor de geração do
+   botão "PDF" (jsPDF), em vez de usar window.print() sobre o HTML
+   ao vivo. Isso evita a distorção dos gráficos que acontecia porque
+   os cards de gráfico têm altura fixa em pixels (calculada para a
+   largura de tela cheia) e não se reajustam corretamente quando o
+   navegador encolhe a largura ao montar o layout de impressão em
+   2 colunas — o que fazia os eixos aparecerem gigantes e os gráficos
+   ficarem espremidos/distorcidos.
+   Abrindo o PDF vetorial (o mesmo arquivo que o botão "PDF" gera)
+   no visualizador do navegador, o botão de imprimir nativo do
+   visualizador produz uma impressão idêntica ao PDF já aprovado.
    ============================================================ */
-function printReport() {
+async function printReport() {
+  if (S.data.length < 2) { toast('Insira dados antes de imprimir!', 'fail'); return; }
+  toast('Preparando impressão…', 'info');
+  try {
+    var pd = gatherPDFData(null);
+    var doc = await buildPDF(pd);
+    var blobUrl = doc.output('bloburl');
+    var win = window.open(blobUrl, '_blank');
+    if (!win) {
+      toast('Pop-up bloqueado. Permita pop-ups para este site e tente novamente, ou use o botão "PDF".', 'fail');
+      return;
+    }
+    toast('Documento pronto — use o botão de imprimir do visualizador de PDF.', 'ok');
+  } catch (e) {
+    console.error('[Print] erro ao gerar documento para impressão:', e);
+    toast('Erro ao preparar impressão: ' + (e.message || e), 'fail');
+  }
+}
+
+/* Mantido apenas como referência/fallback manual (não usado pelo botão
+   "Imprimir" — chame printReportLegacy() no console se precisar do
+   fluxo antigo baseado em window.print() por algum motivo específico). */
+function printReportLegacy() {
   if (S.data.length < 2) { toast('Insira dados antes de imprimir!', 'fail'); return; }
 
   var rpt = document.getElementById('iReport').value;
@@ -6457,42 +6609,67 @@ renderDashboard();
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function(c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
 
   var FLAGS = { 'pt-BR': '🇧🇷', 'es-MX': '🇲🇽', 'es-ES': '🇪🇸', 'en-US': '🇺🇸', 'en-GB': '🇬🇧', 'de-DE': '🇩🇪', 'fr-FR': '🇫🇷', 'it-IT': '🇮🇹' };
+  var COUNTRY_FLAGS = { BR: '🇧🇷', US: '🇺🇸', MX: '🇲🇽', IT: '🇮🇹', DE: '🇩🇪', FR: '🇫🇷', ES: '🇪🇸', GB: '🇬🇧', CN: '🇨🇳', AR: '🇦🇷' };
 
   window.aplRenderGrid = async function() {
     var c = _c();
     if (!c) return;
     var grid = document.getElementById('aplPlantGrid');
     if (!grid) return;
-    var { data: plants, error } = await c.from('plants').select('*').order('code');
-    if (error) { grid.innerHTML = '<div class="apl-empty" style="color:#b00">' + esc(error.message) + '</div>'; return; }
-    document.getElementById('aplStatPlants').textContent = (plants || []).length;
 
-    if (plants && plants.length) {
-      var countries = new Set();
-      var languages = new Set();
-      plants.forEach(function(p) {
-        if (p.country) countries.add(p.country);
-        if (p.language_code) languages.add(p.language_code);
-      });
-      document.getElementById('kpiPlantCount').textContent = plants.length;
-      document.getElementById('kpiCountryCount').textContent = countries.size;
-      document.getElementById('kpiLanguageCount').textContent = languages.size;
-    }
+    try {
+      var nameEl = document.getElementById('aplgCompanyName');
+      if (nameEl && window.__companyBranding && window.__companyBranding.companyName) {
+        nameEl.textContent = window.__companyBranding.companyName;
+      }
+    } catch (e) {}
+
+    var { data: plants, error } = await c.from('plants').select('*').order('code');
+    if (error) { grid.innerHTML = '<div class="aplg-empty" style="color:#f87171">' + esc(error.message) + '</div>'; return; }
+    var statPlantsEl = document.getElementById('aplStatPlants');
+    if (statPlantsEl) statPlantsEl.textContent = (plants || []).length;
+
+    var countries = new Set();
+    var languages = new Set();
+    (plants || []).forEach(function(p) {
+      if (p.country) countries.add(p.country);
+      if (p.language_code) languages.add(p.language_code);
+    });
+    var kpiPlantCountEl = document.getElementById('kpiPlantCount');
+    if (kpiPlantCountEl) kpiPlantCountEl.textContent = (plants || []).length;
+    var kpiCountryCountEl = document.getElementById('kpiCountryCount');
+    if (kpiCountryCountEl) kpiCountryCountEl.textContent = countries.size;
+    var kpiLanguageCountEl = document.getElementById('kpiLanguageCount');
+    if (kpiLanguageCountEl) kpiLanguageCountEl.textContent = languages.size;
 
     if (!plants || !plants.length) {
-      grid.innerHTML = '<div class="apl-empty">🏭 Nenhuma planta cadastrada.<br><span style="font-size:12px">Use o formulário abaixo para cadastrar a primeira unidade.</span></div>';
+      grid.innerHTML = '<div class="aplg-empty">🏭 Nenhuma planta cadastrada.</div>';
       return;
     }
 
+    // Conta estudos por planta em uma única consulta (evita N+1)
+    var countByPlant = {};
+    try {
+      var { data: studyRows } = await c.from('studies').select('plant_id');
+      (studyRows || []).forEach(function(r) {
+        if (r.plant_id) countByPlant[r.plant_id] = (countByPlant[r.plant_id] || 0) + 1;
+      });
+    } catch (e) { console.warn('[APL] Não foi possível contar estudos por planta:', e); }
+
     grid.innerHTML = plants.map(function(p) {
       var lang = p.language_code || 'pt-BR';
-      return '<article class="plant-card" data-plant-id="' + esc(p.id) + '">' +
-        '<div class="pc-top"><div style="flex:1"><span class="pc-code">' + esc(p.code) + '</span></div><span class="pc-flag" title="' + esc(lang) + '">' + (FLAGS[lang] || '🌐') + '</span></div>' +
-        '<div><h3>' + esc(p.name) + '</h3></div>' +
-        '<div class="pc-meta"><span>' + esc(p.country || '—') + '</span><span><code>' + esc(lang) + '</code></span></div>' +
-        '<button class="pc-btn" onclick="aplSelectPlant(\'' + esc(p.id) + '\',\'' + esc(lang) + '\')"><span data-i18n="admin.plants.access">Acessar Planta</span><span class="arr">→</span></button>' +
-        '<button class="pc-btn-edit" onclick="event.stopPropagation();window.aplEditPlant(\'' + esc(p.id) + '\')">✏️ Editar</button>' +
-        '</article>';
+      var flag = COUNTRY_FLAGS[(p.country || '').toUpperCase()] || FLAGS[lang] || '🏭';
+      var n = countByPlant[p.id] || 0;
+      var countLabel = n === 0 ? 'Sem estudos cadastrados' : (n === 1 ? '1 estudo' : n + ' estudos');
+      var letter = (p.code || '?').charAt(0).toUpperCase();
+      return '<button type="button" class="aplg-card" data-plant-id="' + esc(p.id) + '" onclick="aplSelectPlant(\'' + esc(p.id) + '\',\'' + esc(lang) + '\')">' +
+        '<div class="aplg-flag">' + flag + '<span class="aplg-code-chip">' + esc(letter) + '</span></div>' +
+        '<div class="aplg-body">' +
+        '<div class="aplg-name">' + esc(p.name || p.code) + '</div>' +
+        '<div class="aplg-meta"><span class="dot ok"></span><span>' + countLabel + '</span></div>' +
+        '</div>' +
+        '<span class="aplg-arrow">→</span>' +
+        '</button>';
     }).join('');
     if (window.applyI18nToDOM) try { window.applyI18nToDOM(); } catch (e) {}
   };
