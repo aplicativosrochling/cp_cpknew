@@ -1901,8 +1901,20 @@ body {
   .kpi-strip { display: grid !important; grid-template-columns: repeat(6, 1fr) !important; gap: 3px !important; }
   .charts-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 3mm !important; }
   .chart-card { display: block !important; padding: 6px 8px !important; background: #fff !important; box-shadow: none !important; border: 1px solid #d0d5e8 !important; border-radius: 4px !important; overflow: hidden !important; page-break-inside: avoid !important; break-inside: avoid !important; box-sizing: border-box !important; max-width: 100% !important; }
-  .chart-area { overflow: hidden !important; max-width: 100% !important; }
-  .chart-area canvas { max-width: 100% !important; width: 100% !important; height: auto !important; }
+  .chart-area {
+    overflow: hidden !important;
+    max-width: 100% !important;
+    /* CRÍTICO: sem isso, a altura inline em px (calculada em JS para a
+       largura de tela cheia) permanece intacta enquanto a largura do
+       card encolhe pela metade no layout de impressão em 2 colunas.
+       O Chart.js recalcula o gráfico para essa nova proporção
+       (muito estreita + muito alta), fazendo textos/eixos aparecerem
+       gigantes e os pontos/barras ficarem espremidos. Forçar uma
+       altura fixa e proporcional aqui resolve a distorção. */
+    height: 46mm !important;
+    max-height: 46mm !important;
+  }
+  .chart-area canvas { max-width: 100% !important; width: 100% !important; height: 100% !important; }
   .study-header, .kpi-strip { page-break-inside: avoid !important; break-inside: avoid !important; }
   .stats-wrap { display: block !important; border: 1px solid #c8cee0 !important; border-radius: 4px !important; margin-top: 3mm !important; }
   .print-data-section { display: block !important; padding: 6px 10px !important; background: #fff !important; border: 1px solid #c8cee0 !important; border-top: none !important; border-radius: 0 0 4px 4px !important; }
@@ -5619,42 +5631,8 @@ function importBackup(input) {
 
 /* ============================================================
    PRINT
-   ============================================================
-   O botão "Imprimir" agora reutiliza o MESMO motor de geração do
-   botão "PDF" (jsPDF), em vez de usar window.print() sobre o HTML
-   ao vivo. Isso evita a distorção dos gráficos que acontecia porque
-   os cards de gráfico têm altura fixa em pixels (calculada para a
-   largura de tela cheia) e não se reajustam corretamente quando o
-   navegador encolhe a largura ao montar o layout de impressão em
-   2 colunas — o que fazia os eixos aparecerem gigantes e os gráficos
-   ficarem espremidos/distorcidos.
-   Abrindo o PDF vetorial (o mesmo arquivo que o botão "PDF" gera)
-   no visualizador do navegador, o botão de imprimir nativo do
-   visualizador produz uma impressão idêntica ao PDF já aprovado.
    ============================================================ */
-async function printReport() {
-  if (S.data.length < 2) { toast('Insira dados antes de imprimir!', 'fail'); return; }
-  toast('Preparando impressão…', 'info');
-  try {
-    var pd = gatherPDFData(null);
-    var doc = await buildPDF(pd);
-    var blobUrl = doc.output('bloburl');
-    var win = window.open(blobUrl, '_blank');
-    if (!win) {
-      toast('Pop-up bloqueado. Permita pop-ups para este site e tente novamente, ou use o botão "PDF".', 'fail');
-      return;
-    }
-    toast('Documento pronto — use o botão de imprimir do visualizador de PDF.', 'ok');
-  } catch (e) {
-    console.error('[Print] erro ao gerar documento para impressão:', e);
-    toast('Erro ao preparar impressão: ' + (e.message || e), 'fail');
-  }
-}
-
-/* Mantido apenas como referência/fallback manual (não usado pelo botão
-   "Imprimir" — chame printReportLegacy() no console se precisar do
-   fluxo antigo baseado em window.print() por algum motivo específico). */
-function printReportLegacy() {
+function printReport() {
   if (S.data.length < 2) { toast('Insira dados antes de imprimir!', 'fail'); return; }
 
   var rpt = document.getElementById('iReport').value;
