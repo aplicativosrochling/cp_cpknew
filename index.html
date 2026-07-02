@@ -40,6 +40,11 @@ const S = { data: [], lsl: null, usl: null, target: null, specType: 'bilateral' 
 const CH = { hist: null, ic: null, mr: null, box: null, qq: null, cpktrend: null };
 let lastStats = null;
 let currentStudyId = null;
+// ID do estudo realmente carregado no editor (Análise). É separado de
+// currentStudyId porque este último também é usado pelo modal de
+// visualização ("👁 Ver"), e simplesmente olhar outro estudo na lista
+// não pode fazer o Salvar perder a referência do que está sendo editado.
+let editingStudyId = null;
 let STUDIES = [];
 let _dashView = 'classic';
 const CM_SPARKS = {};
@@ -319,6 +324,18 @@ function initSupabaseClient() {
       return out;
     }
 
+    function _decFromValues(row, dataArr) {
+      function cd(v) {
+        if (v == null || v === '' || isNaN(v)) return 0;
+        var s = String(v);
+        var dot = s.indexOf('.');
+        return dot < 0 ? 0 : s.length - dot - 1;
+      }
+      var m = Math.max(cd(row.lsl), cd(row.usl), cd(row.target));
+      for (var i = 0; i < dataArr.length; i++) m = Math.max(m, cd(dataArr[i]));
+      return Math.max(0, Math.min(8, m || 4));
+    }
+
     function studyFromRow(row) {
       if (!row) return null;
       var dataArr = _numArr(row.data_values);
@@ -356,7 +373,10 @@ function initSupabaseClient() {
         report: row.report_num || '',
         notes: row.notes || '',
         data: dataArr,
-        dec: 4,
+        // Usa o valor salvo (decimal_places) se a coluna existir no banco;
+        // caso contrário, calcula a partir da precisão real dos dados/
+        // limites em vez de sempre cair para 4 casas fixas.
+        dec: (row.decimal_places != null) ? row.decimal_places : _decFromValues(row, dataArr),
         stats: stats,
         plantId: row.plant_id,
         userId: row.user_id,
@@ -392,6 +412,11 @@ function initSupabaseClient() {
         pp: _num(st.Pp),
         ppk: _num(st.Ppk),
         ppm_estimated: _num(st.ppm),
+        // Casas decimais escolhidas pelo usuário para exibição dos
+        // resultados. Se a coluna 'decimal_places' ainda não existir no
+        // banco, o saveStudy() abaixo detecta isso e reenvia sem este
+        // campo (para não quebrar o salvamento), avisando uma vez.
+        decimal_places: (s.dec != null ? s.dec : (typeof DEC !== 'undefined' ? DEC : 4)),
         status: 'pending'
       };
       
@@ -417,25 +442,47 @@ function initSupabaseClient() {
           if (!_currentSession) throw new Error('Não autenticado');
           var row = studyToRow(s);
 
-          var query;
-          if (row.id && typeof row.id === 'number') {
-            var studyId = row.id;
-            var updateRow = Object.assign({}, row);
-            delete updateRow.id;
-            query = supabaseClient.from('studies')
-              .update(updateRow)
-              .eq('id', studyId)
-              .select()
-              .single();
-          } else {
-            delete row.id;
-            query = supabaseClient.from('studies')
-              .insert(row)
+          function buildQuery(r) {
+            if (r.id && typeof r.id === 'number') {
+              var studyId = r.id;
+              var updateRow = Object.assign({}, r);
+              delete updateRow.id;
+              return supabaseClient.from('studies')
+                .update(updateRow)
+                .eq('id', studyId)
+                .select()
+                .single();
+            }
+            var insertRow = Object.assign({}, r);
+            delete insertRow.id;
+            return supabaseClient.from('studies')
+              .insert(insertRow)
               .select()
               .single();
           }
 
-          var { data, error } = await query;
+          var { data, error } = await buildQuery(row);
+
+          // A coluna 'decimal_places' pode ainda não existir na tabela
+          // 'studies' do Supabase. Em vez de quebrar o salvamento inteiro,
+          // detecta esse erro específico, tenta de novo sem o campo e
+          // avisa uma única vez que essa configuração não vai persistir
+          // até a coluna ser criada.
+          if (error && /decimal_places/i.test(error.message || '') && (error.code === 'PGRST204' || error.code === '42703' || /column/i.test(error.message || ''))) {
+            console.warn('[SB] Coluna decimal_places não existe na tabela "studies" — salvando sem ela. Para as casas decimais persistirem, rode no Supabase: ALTER TABLE studies ADD COLUMN decimal_places integer;');
+            if (!window.__decColWarned) {
+              window.__decColWarned = true;
+              if (typeof toast === 'function') {
+                toast('Casas decimais não serão salvas até a coluna "decimal_places" ser criada no Supabase (ver console).', 'warn');
+              }
+            }
+            var rowNoDec = Object.assign({}, row);
+            delete rowNoDec.decimal_places;
+            var retry = await buildQuery(rowNoDec);
+            data = retry.data;
+            error = retry.error;
+          }
+
           if (error) {
             console.error('[SB] Erro save:', error.message);
             throw error;
@@ -450,6 +497,25 @@ function initSupabaseClient() {
             console.error('[SB] Erro delete:', error.message);
             throw error;
           }
+        },
+
+        // Busca um único estudo direto do servidor (sem depender do cache
+        // em memória). Usado ao abrir um estudo para edição/visualização,
+        // para garantir que o que aparece é sempre o dado mais recente
+        // realmente salvo no banco — evita mostrar dados desatualizados
+        // logo após uma edição.
+        getOne: async function(id) {
+          if (!_currentSession) throw new Error('Não autenticado');
+          var { data, error } = await supabaseClient
+            .from('studies')
+            .select('*')
+            .eq('id', id)
+            .single();
+          if (error) {
+            console.error('[SB] getOne falhou:', error.message);
+            throw error;
+          }
+          return studyFromRow(data);
         },
 
         getAll: async function() {
@@ -1944,50 +2010,50 @@ body {
   .app, .analysis-layout, .content { display: block !important; width: 100% !important; padding: 0 !important; }
 
   #printPageHeader {
-    display: block !important; padding: 0 0 3mm 0 !important; margin-bottom: 3mm !important;
+    display: block !important; padding: 0 0 2mm 0 !important; margin-bottom: 2mm !important;
     border-bottom: 2px solid #1565C0 !important;
     page-break-after: avoid !important; break-after: avoid !important;
   }
 
   .study-header {
-    display: block !important; margin: 0 0 1.5mm 0 !important; padding: 4px 8px !important;
+    display: block !important; margin: 0 0 1mm 0 !important; padding: 3px 7px !important;
     background: #fff !important; box-shadow: none !important;
     border: 1px solid #dee2e6 !important; border-left: 3px solid #1565C0 !important;
     border-radius: 4px !important; font-size: 9px !important;
     page-break-inside: avoid !important; break-inside: avoid !important;
   }
   .study-header-top {
-    margin-bottom: 3px !important; padding-bottom: 3px !important;
+    margin-bottom: 2px !important; padding-bottom: 2px !important;
   }
   .study-status-dot { width: 7px !important; height: 7px !important; box-shadow: 0 0 0 2px var(--s3) !important; }
   .study-name { font-size: 10.5px !important; }
-  .study-meta-grid { gap: 3px 10px !important; }
+  .study-meta-grid { gap: 2px 10px !important; }
   .study-meta-label { font-size: 7px !important; margin-bottom: 0 !important; }
   .study-meta-value { font-size: 9px !important; }
 
   .kpi-strip {
     display: grid !important; grid-template-columns: repeat(6, 1fr) !important; gap: 2px !important;
     page-break-inside: avoid !important; break-inside: avoid !important;
-    margin-bottom: 1.5mm !important;
+    margin-bottom: 1mm !important;
   }
-  .kpi { border: 1px solid #dee2e6 !important; box-shadow: none !important; background: #fff !important; padding: 4px 5px !important; }
+  .kpi { border: 1px solid #dee2e6 !important; box-shadow: none !important; background: #fff !important; padding: 3px 4px !important; }
   .kpi-tag { font-size: 6.5px !important; margin-bottom: 1px !important; }
-  .kpi-val { font-size: 14px !important; margin-bottom: 1px !important; }
-  .kpi-sub { font-size: 6.5px !important; margin-bottom: 2px !important; }
+  .kpi-val { font-size: 13px !important; margin-bottom: 1px !important; }
+  .kpi-sub { font-size: 6.5px !important; margin-bottom: 1px !important; }
   .kpi-track { height: 2px !important; }
-  .kpi-divider { margin: 3px 0 !important; }
+  .kpi-divider { margin: 2px 0 !important; }
 
   .banner {
-    padding: 6px 10px !important; gap: 8px !important;
+    padding: 5px 8px !important; gap: 8px !important;
     box-shadow: none !important; border-radius: 4px !important;
     page-break-inside: avoid !important; break-inside: avoid !important;
-    margin-bottom: 1.5mm !important;
+    margin-bottom: 1mm !important;
   }
-  .banner-icon { font-size: 16px !important; }
-  .banner-title { font-size: 10px !important; margin-bottom: 1px !important; }
-  .banner-desc { font-size: 8px !important; }
-  .banner-metrics { gap: 10px !important; }
-  .bm-val { font-size: 13px !important; }
+  .banner-icon { font-size: 14px !important; }
+  .banner-title { font-size: 9px !important; margin-bottom: 1px !important; }
+  .banner-desc { font-size: 7.5px !important; }
+  .banner-metrics { gap: 8px !important; }
+  .bm-val { font-size: 12px !important; }
   .bm-lbl { font-size: 7px !important; }
 
   .cpill, .unilateral-badge, .kpi-badge { box-shadow: none !important; background-image: none !important; padding: 1px 5px !important; font-size: 7px !important; }
@@ -1996,23 +2062,24 @@ body {
   .cpill-a { background: #fff4e0 !important; color: #a15c00 !important; border: 1px solid #f0d49b !important; }
   .cpill-b { background: #e8f0fe !important; color: #174ea6 !important; border: 1px solid #b6cdf3 !important; }
 
-  .charts-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 1.5mm !important; }
+  .charts-grid { display: grid !important; grid-template-columns: 1fr !important; gap: 1mm !important; }
   .chart-card {
-    display: block !important; padding: 3px 5px !important; background: #fff !important;
+    display: block !important; padding: 2px 4px !important; background: #fff !important;
     box-shadow: none !important; border: 1px solid #dee2e6 !important; border-radius: 4px !important;
     overflow: hidden !important; box-sizing: border-box !important; max-width: 100% !important;
+    grid-column: 1 / -1 !important;
     page-break-inside: avoid !important; break-inside: avoid !important;
   }
-  .chart-hd { display: flex !important; flex-wrap: wrap !important; margin-bottom: 3px !important; }
+  .chart-hd { display: flex !important; flex-wrap: wrap !important; margin-bottom: 2px !important; }
   .chart-title { font-size: 8.5px !important; }
   .chart-pills { display: flex !important; flex-wrap: wrap !important; gap: 2px !important; }
-  .chart-note { font-size: 7px !important; margin-top: 2px !important; }
+  .chart-note { font-size: 7px !important; margin-top: 1px !important; }
 
   .chart-area {
     width: 100% !important;
     max-width: 100% !important;
-    height: 46mm !important;
-    max-height: 46mm !important;
+    height: 50mm !important;
+    max-height: 50mm !important;
     overflow: hidden !important;
     position: relative !important;
   }
@@ -2037,23 +2104,9 @@ body {
   .stats-wrap .sec-hd td { padding: 1.5px 5px !important; font-size: 6.5px !important; }
   .stats-wrap .badge { padding: 1px 5px !important; font-size: 6.5px !important; }
 
-  /* Histograma + Curva Normal em destaque: ocupa a largura toda e fica
-     maior que os demais gráficos na impressão, sem deixar espaço em
-     branco excessivo sobrando na página */
-  .chart-card:has(#aHist) { grid-column: 1 / -1 !important; }
-  .chart-card:has(#aHist) .chart-area { height: 56mm !important; max-height: 56mm !important; }
-
   /* Indicador Cpk / Gauge: removido da impressão a pedido — não agrega
      informação além do KPI Cpk já exibido no topo do relatório. */
   #chartCardGauge { display: none !important; }
-
-  /* Gráfico I — Valores Individuais: ocupa a largura toda e fica maior
-     na impressão, ocupando o espaço que sobrou com a remoção do gauge.
-     Altura reduzida (junto com o cabeçalho/banner mais compactos acima)
-     para que Histograma + Gráfico I caibam inteiros na página 1, sem
-     deixar espaço em branco no rodapé da página. */
-  #chartCardIC { grid-column: 1 / -1 !important; }
-  #chartCardIC .chart-area { height: 56mm !important; max-height: 56mm !important; }
 
   .print-data-section {
     display: block !important; padding: 5px 9px !important; background: #fff !important;
@@ -3648,6 +3701,7 @@ function renderDashboard() {
     });
   }
   try { renderDashboardExtras(all); } catch (e) { console.warn('extras', e); }
+  try { if (typeof window.applyI18nToDOM === 'function') window.applyI18nToDOM(); } catch (e) {}
 }
 
 /* ============================================================
@@ -4760,6 +4814,12 @@ function refresh() {
   document.getElementById('pMRUCL').textContent = 'UCL=' + f(st.UCLmr);
   document.getElementById('pCtrl').textContent = st.ooc === 0 ? 'Sem Violações' : st.ooc + ' Violações';
   document.getElementById('pCtrl').className = 'cpill ' + (st.ooc === 0 ? 'cpill-g' : 'cpill-r');
+
+  // A tabela de estatísticas (.stats-wrap / <td>), KPIs e banner acima
+  // são reconstruídos com texto em português a cada refresh(). Reaplica
+  // a tradução do idioma atual da planta sobre esse conteúdo recém-
+  // gerado, senão ele fica destraduzido após a primeira atualização.
+  try { if (typeof window.applyI18nToDOM === 'function') window.applyI18nToDOM(); } catch (e) {}
 }
 
 function clearVisuals() {
@@ -5208,6 +5268,7 @@ function resetAll() {
   S.specType = 'bilateral';
   lastStats = null;
   currentStudyId = null;
+  editingStudyId = null;
   ['iPN', 'iPartName', 'iCharCode', 'iCharName', 'iSpecBy', 'iUnit', 'iOwner', 'iEquip', 'iReport', 'iNotes', 'iLSL', 'iUSL', 'iTarget', 'iPaste'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
@@ -5227,6 +5288,7 @@ function resetAll() {
 
 function newStudy(btn) {
   currentStudyId = null;
+  editingStudyId = null;
   S.data = [];
   S.lsl = null;
   S.usl = null;
@@ -5310,8 +5372,8 @@ function saveStudy() {
     }
   };
 
-  if (currentStudyId && typeof currentStudyId === 'number') {
-    study.id = currentStudyId;
+  if (editingStudyId != null && isFinite(Number(editingStudyId))) {
+    study.id = Number(editingStudyId);
   }
 
   var syncEl = document.getElementById('dashSyncState');
@@ -5325,6 +5387,7 @@ function saveStudy() {
       if (saved && saved.id) {
         study.id = saved.id;
         currentStudyId = saved.id;
+        editingStudyId = saved.id;
       }
 
       // Atualiza cache local
@@ -5404,6 +5467,7 @@ function saveStudyAsNew() {
       if (newId) {
         study.id = newId;
         currentStudyId = newId;
+        editingStudyId = newId;
       }
 
       var local = JSON.parse(localStorage.getItem('spc_studies') || '[]');
@@ -5491,9 +5555,25 @@ async function refreshStudiesFromSupabase() {
 }
 window.refreshStudiesFromSupabase = refreshStudiesFromSupabase;
 
-function loadStudyToEditor(id) {
+async function loadStudyToEditor(id) {
   var sid = id || currentStudyId;
   var study = STUDIES.find(function(s) { return String(s.id) === String(sid); });
+
+  // Busca a versão mais recente direto do Supabase antes de abrir para
+  // edição — evita mostrar dados desatualizados logo após salvar.
+  if (window.FB && window.FB.getOne) {
+    try {
+      var fresh = await window.FB.getOne(sid);
+      if (fresh) {
+        study = fresh;
+        var idx = STUDIES.findIndex(function(s) { return String(s.id) === String(sid); });
+        if (idx >= 0) STUDIES[idx] = fresh; else STUDIES.push(fresh);
+      }
+    } catch (e) {
+      console.warn('[FB] Não foi possível buscar versão mais recente, usando cache local:', e && e.message);
+    }
+  }
+
   if (!study) return;
   var fields = { iPN: 'pn', iPartName: 'pname', iCharCode: 'cc', iCharName: 'cn', iSpecBy: 'specBy', iUnit: 'unit', iOwner: 'owner', iDate: 'date', iEquip: 'equip', iReport: 'report', iNotes: 'notes' };
   Object.entries(fields).forEach(function(_ref) {
@@ -5513,6 +5593,7 @@ function loadStudyToEditor(id) {
   DEC = study.dec || 4;
   document.getElementById('decDisplay').textContent = DEC;
   currentStudyId = study.id;
+  editingStudyId = study.id;
   refresh();
   showPage('analysis', document.querySelectorAll('.nav-tab')[1]);
   closeModal();
@@ -5534,6 +5615,7 @@ function deleteCurrentStudy() {
       var local = JSON.parse(localStorage.getItem('spc_studies') || '[]');
       localStorage.setItem('spc_studies', JSON.stringify(local.filter(function(s) { return s.id !== delId; })));
       STUDIES = STUDIES.filter(function(s) { return s.id !== delId; });
+      if (String(editingStudyId) === String(delId)) editingStudyId = null;
       currentStudyId = null;
       closeModal();
       renderStudiesList();
@@ -5574,6 +5656,7 @@ function renderStudiesList() {
       '<svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="8" y="6" width="32" height="36" rx="3" stroke="#d0d5e8" stroke-width="2" fill="none"/><line x1="14" y1="16" x2="34" y2="16" stroke="#d0d5e8" stroke-width="2"/><line x1="14" y1="22" x2="34" y2="22" stroke="#d0d5e8" stroke-width="2"/><line x1="14" y1="28" x2="26" y2="28" stroke="#d0d5e8" stroke-width="2"/></svg>' +
       '<h3>Nenhum estudo encontrado</h3>' +
       '<p>' + (q ? 'Tente outros termos de busca.' : 'Salve um estudo na aba Análise para vê-lo aqui.') + '</p></div>';
+    try { if (typeof window.applyI18nToDOM === 'function') window.applyI18nToDOM(); } catch (e) {}
     return;
   }
 
@@ -5595,11 +5678,27 @@ function renderStudiesList() {
       '<button class="btn btn-danger btn-xs" onclick="deleteStudyById(\'' + s.id + '\')">✕</button></div>' +
       '<div style="font-size:9.5px;color:var(--t3);margin-top:8px;padding-top:6px;border-top:1px solid var(--s2)">Salvo: ' + savedDate + '</div></div>';
   }).join('') + '</div>';
+  try { if (typeof window.applyI18nToDOM === 'function') window.applyI18nToDOM(); } catch (e) {}
 }
 
-function openStudyModal(id) {
+async function openStudyModal(id) {
   currentStudyId = id;
   var s = STUDIES.find(function(s2) { return String(s2.id) === String(id); });
+
+  // Busca a versão mais recente direto do Supabase antes de exibir.
+  if (window.FB && window.FB.getOne) {
+    try {
+      var fresh = await window.FB.getOne(id);
+      if (fresh) {
+        s = fresh;
+        var idx = STUDIES.findIndex(function(s2) { return String(s2.id) === String(id); });
+        if (idx >= 0) STUDIES[idx] = fresh; else STUDIES.push(fresh);
+      }
+    } catch (e) {
+      console.warn('[FB] Não foi possível buscar versão mais recente, usando cache local:', e && e.message);
+    }
+  }
+
   if (!s) return;
   var st = s.stats;
   var cls = st.Cpk == null ? '' : st.Cpk >= 1.67 ? 'ok' : st.Cpk >= 1.33 ? 'warn' : 'fail';
@@ -5641,6 +5740,7 @@ function openStudyModal(id) {
     '</div>' +
     (s.notes ? '<div style="margin-top:12px;padding:10px;background:var(--s1);border-radius:var(--r);font-size:11.5px;color:var(--t1)">' + s.notes + '</div>' : '');
   document.getElementById('studyModal').classList.add('open');
+  try { if (typeof window.applyI18nToDOM === 'function') window.applyI18nToDOM(); } catch (e) {}
 }
 
 function closeModal() { document.getElementById('studyModal').classList.remove('open'); }
@@ -5654,6 +5754,7 @@ function deleteStudyById(id) {
       var local = JSON.parse(localStorage.getItem('spc_studies') || '[]');
       localStorage.setItem('spc_studies', JSON.stringify(local.filter(function(s) { return String(s.id) !== String(id); })));
       STUDIES = STUDIES.filter(function(s) { return String(s.id) !== String(id); });
+      if (String(editingStudyId) === String(id)) editingStudyId = null;
       renderStudiesList();
       toast('Estudo excluído', 'warn');
     })
@@ -7246,7 +7347,47 @@ renderDashboard();
       'Aceitável (≥1.00)': 'Acceptable (≥1.00)', 'Reprovado (<1.00)': 'Failed (<1.00)',
       'Novo Estudo de Capabilidade': 'New Capability Study',
       'Característica': 'Characteristic', 'Nome Característica': 'Characteristic Name',
-      'Especificado': 'Specified', 'Unidade': 'Unit', 'Responsável': 'Responsible', 'Data': 'Date'
+      'Especificado': 'Specified', 'Unidade': 'Unit', 'Responsável': 'Responsible', 'Data': 'Date',
+      'Especificação (por)': 'Specification (by)', 'Unidade de Medida': 'Unit of Measure',
+      'Target / Nominal': 'Target / Nominal', 'Mínimo': 'Minimum', 'Máximo': 'Maximum',
+      'Definido': 'Defined', 'Não definido': 'Not defined', 'Calculado': 'Calculated',
+      'Info': 'Info', 'Referência da peça': 'Part reference',
+      'Nome da característica medida': 'Name of the measured characteristic',
+      'Norma/Desenho de referência': 'Reference standard/drawing',
+      'Unidade dos dados': 'Data unit', 'Bilateral ou Unilateral': 'Bilateral or Unilateral',
+      'Limite inferior de especificação': 'Lower specification limit',
+      'Valor nominal / alvo': 'Nominal / target value',
+      'Limite superior de especificação': 'Upper specification limit',
+      'Centro do processo': 'Process center', 'Valor central da amostra': 'Central value of the sample',
+      'Variabilidade global do processo': 'Overall process variability',
+      'Quadrática da variabilidade': 'Square of the variability',
+      'Menor valor medido': 'Smallest measured value', 'Maior valor medido': 'Largest measured value',
+      'Diferença entre máximo e mínimo': 'Difference between maximum and minimum',
+      'Medida de simetria da distribuição': 'Measure of distribution symmetry',
+      'Medida de achatamento da distribuição': 'Measure of distribution flatness',
+      'Verificar': 'Check',
+      'Constante para estimativa de σ̂ via amplitude móvel': 'Constant for estimating σ̂ via moving range',
+      'Constante UCL para gráfico de amplitude móvel': 'UCL constant for the moving range chart',
+      'Média das amplitudes móveis entre observações consecutivas': 'Mean of the moving ranges between consecutive observations',
+      'Violações da regra 3σ no I-Chart': '3σ rule violations on the I-Chart',
+      'Sem pts fora UCL/LCL + sem corridas': 'No points outside UCL/LCL + no runs',
+      'Baseado em regra 3σ e run-rule de 8 pts consecutivos': 'Based on the 3σ rule and an 8-consecutive-point run rule',
+      'Contagem de observações fora de LSL/USL': 'Count of observations outside LSL/USL',
+      'Estimativa baseada na distribuição normal. Para PPM real, usar dados históricos.': 'Estimate based on the normal distribution. For real PPM, use historical data.',
+      'peça(s)': 'part(s)', 'Alto': 'High', 'Atualizado': 'Updated',
+      '📋 Identificação do Estudo': '📋 Study Identification',
+      '📊 Estatísticas Descritivas': '📊 Descriptive Statistics',
+      '📈 Índices de Capabilidade — AIAG / ISO 22514': '📈 Capability Indices — AIAG / ISO 22514',
+      '🎛️ Gráfico de Controle I-MR — AIAG SPC Manual 2ª Ed.': '🎛️ I-MR Control Chart — AIAG SPC Manual 2nd Ed.',
+      'Capabilidade Potencial (Largura da tolerância / 6σ̂)': 'Potential Capability (Tolerance width / 6σ̂)',
+      'Capabilidade Real (centramento + variabilidade)': 'Real Capability (centering + variability)',
+      'Performance Potencial (Largura da tolerância / 6s)': 'Potential Performance (Tolerance width / 6s)',
+      'Performance Real (centramento + variabilidade global)': 'Real Performance (centering + overall variability)',
+      'Capabilidade unilateral superior (USL)': 'Upper one-sided capability (USL)',
+      'Capabilidade unilateral inferior (LSL)': 'Lower one-sided capability (LSL)',
+      'Tabela AIAG': 'AIAG table', 'AIAG': 'AIAG',
+      'Sem nome': 'Unnamed', 'Capaz': 'Capable', 'Monitor': 'Monitor',
+      'Salvo': 'Saved'
     },
     'es-MX': {
       'Carregando…': 'Cargando…', 'Salvando…': 'Guardando…', 'Criando…': 'Creando…',
@@ -7301,7 +7442,47 @@ renderDashboard();
       'amostras': 'muestras', 'Valor': 'Valor',
       'Novo Estudo de Capabilidade': 'Nuevo Estudio de Capacidad',
       'Característica': 'Característica', 'Nome Característica': 'Nombre Característica',
-      'Especificado': 'Especificado', 'Unidade': 'Unidad', 'Responsável': 'Responsable', 'Data': 'Fecha'
+      'Especificado': 'Especificado', 'Unidade': 'Unidad', 'Responsável': 'Responsable', 'Data': 'Fecha',
+      'Especificação (por)': 'Especificación (por)', 'Unidade de Medida': 'Unidad de Medida',
+      'Target / Nominal': 'Objetivo / Nominal', 'Mínimo': 'Mínimo', 'Máximo': 'Máximo',
+      'Definido': 'Definido', 'Não definido': 'No definido', 'Calculado': 'Calculado',
+      'Info': 'Info', 'Referência da peça': 'Referencia de la pieza',
+      'Nome da característica medida': 'Nombre de la característica medida',
+      'Norma/Desenho de referência': 'Norma/Plano de referencia',
+      'Unidade dos dados': 'Unidad de los datos', 'Bilateral ou Unilateral': 'Bilateral o Unilateral',
+      'Limite inferior de especificação': 'Límite inferior de especificación',
+      'Valor nominal / alvo': 'Valor nominal / objetivo',
+      'Limite superior de especificação': 'Límite superior de especificación',
+      'Centro do processo': 'Centro del proceso', 'Valor central da amostra': 'Valor central de la muestra',
+      'Variabilidade global do processo': 'Variabilidad global del proceso',
+      'Quadrática da variabilidade': 'Cuadrática de la variabilidad',
+      'Menor valor medido': 'Menor valor medido', 'Maior valor medido': 'Mayor valor medido',
+      'Diferença entre máximo e mínimo': 'Diferencia entre máximo y mínimo',
+      'Medida de simetria da distribuição': 'Medida de simetría de la distribución',
+      'Medida de achatamento da distribuição': 'Medida de aplanamiento de la distribución',
+      'Verificar': 'Verificar',
+      'Constante para estimativa de σ̂ via amplitude móvel': 'Constante para estimar σ̂ mediante el rango móvil',
+      'Constante UCL para gráfico de amplitude móvel': 'Constante UCL para el gráfico de rango móvil',
+      'Média das amplitudes móveis entre observações consecutivas': 'Media de los rangos móviles entre observaciones consecutivas',
+      'Violações da regra 3σ no I-Chart': 'Violaciones de la regla 3σ en el gráfico I',
+      'Sem pts fora UCL/LCL + sem corridas': 'Sin puntos fuera de UCL/LCL + sin rachas',
+      'Baseado em regra 3σ e run-rule de 8 pts consecutivos': 'Basado en la regla 3σ y una racha de 8 puntos consecutivos',
+      'Contagem de observações fora de LSL/USL': 'Conteo de observaciones fuera de LEC/UEC',
+      'Estimativa baseada na distribuição normal. Para PPM real, usar dados históricos.': 'Estimación basada en la distribución normal. Para el PPM real, usar datos históricos.',
+      'peça(s)': 'pieza(s)', 'Alto': 'Alto', 'Atualizado': 'Actualizado',
+      '📋 Identificação do Estudo': '📋 Identificación del Estudio',
+      '📊 Estatísticas Descritivas': '📊 Estadísticas Descriptivas',
+      '📈 Índices de Capabilidade — AIAG / ISO 22514': '📈 Índices de Capacidad — AIAG / ISO 22514',
+      '🎛️ Gráfico de Controle I-MR — AIAG SPC Manual 2ª Ed.': '🎛️ Gráfico de Control I-MR — Manual SPC AIAG 2ª Ed.',
+      'Capabilidade Potencial (Largura da tolerância / 6σ̂)': 'Capacidad Potencial (Ancho de tolerancia / 6σ̂)',
+      'Capabilidade Real (centramento + variabilidade)': 'Capacidad Real (centrado + variabilidad)',
+      'Performance Potencial (Largura da tolerância / 6s)': 'Rendimiento Potencial (Ancho de tolerancia / 6s)',
+      'Performance Real (centramento + variabilidade global)': 'Rendimiento Real (centrado + variabilidad global)',
+      'Capabilidade unilateral superior (USL)': 'Capacidad unilateral superior (UEC)',
+      'Capabilidade unilateral inferior (LSL)': 'Capacidad unilateral inferior (LEC)',
+      'Tabela AIAG': 'Tabla AIAG', 'AIAG': 'AIAG',
+      'Sem nome': 'Sin nombre', 'Capaz': 'Capaz', 'Monitor': 'Monitorear',
+      'Salvo': 'Guardado'
     },
     'de-DE': {
       'Carregando…': 'Lädt…', 'Salvando…': 'Speichert…', 'Criando…': 'Erstellt…',
@@ -7372,12 +7553,23 @@ renderDashboard();
   window.__defaultCompanyName = 'Process Stat';
   window.__defaultCompanySubtitle = 'Análise de Capabilidade de Processo';
 
+  // Só aceita um logo se for realmente uma imagem válida (data URI de
+  // imagem, com um tamanho mínimo plausível). Isso evita que um valor
+  // corrompido ou incompleto salvo anteriormente (ex: de uma tentativa
+  // com bug) quebre a exibição do logo — nesse caso cai no logo padrão.
+  function isValidImageDataUrl(s) {
+    return typeof s === 'string' && /^data:image\/(png|jpe?g|svg\+xml|gif|webp);base64,/.test(s) && s.length > 100;
+  }
+
   // Aplica a identidade (logo/nome) atual — customizada via modal
   // "Empresa" ou a padrão — em todos os lugares visíveis: topo do app
   // e cabeçalho de impressão/PDF.
   window.applyBrandingUI = function() {
     var b = window.__companyBranding || null;
-    var logo = (b && b.logoDataUrl) || window.__companyLogo || window.__defaultLogoDataUrl;
+    var customLogo = (b && isValidImageDataUrl(b.logoDataUrl) && b.logoDataUrl)
+      || (isValidImageDataUrl(window.__companyLogo) && window.__companyLogo)
+      || '';
+    var logo = customLogo || window.__defaultLogoDataUrl;
     var name = (b && b.companyName) || window.__companyName || window.__defaultCompanyName;
     var subtitle = (b && b.companySubtitle) || window.__defaultCompanySubtitle;
 
@@ -7403,6 +7595,19 @@ renderDashboard();
     var nameEl = document.getElementById('companyName');
     if (nameEl && name) nameEl.textContent = name;
   };
+
+  // Rede de segurança: se por qualquer motivo o logo atribuído falhar ao
+  // carregar no navegador, volta automaticamente para o logo padrão em
+  // vez de mostrar o ícone de imagem quebrada.
+  ['topbarLogoImg', 'printHeaderLogo'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('error', function() {
+      if (window.__defaultLogoDataUrl && el.src !== window.__defaultLogoDataUrl) {
+        el.src = window.__defaultLogoDataUrl;
+      }
+    });
+  });
 
   function loadCompanyFromSupabase() {
     if (!window._supabase) { applyBrandingUI(); return; }
