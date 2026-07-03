@@ -87,7 +87,6 @@ function initSupabaseClient() {
     // ============================================================
     
     async function loadTranslationsFromDatabase(languageCode) {
-      // Limpa completamente os dicionários para evitar resíduos do idioma anterior.
       i18nStrings = {};
       i18nFlatDict = {};
       try {
@@ -194,14 +193,25 @@ function initSupabaseClient() {
       });
 
       _translateTextNodes();
-      try { if (typeof window.reRenderChartsWithNewLanguage === 'function') window.reRenderChartsWithNewLanguage(); } catch (e) {}
-      try { window.dispatchEvent(new CustomEvent('i18n:changed', { detail: { lang: _currentLanguage } })); } catch (e) {}
+      // Re-render pesado (charts + dashboard/estudos/análise) SOMENTE
+      // quando o idioma efetivamente mudou. applyI18nToDOM() é chamada
+      // em muitos pontos (abas, salvar, etc.) e re-renderizar sempre
+      // causa colisões de canvas do Chart.js.
+      var _lang = _currentLanguage || 'pt-BR';
+      if (window.__lastI18nRenderLang !== _lang) {
+        window.__lastI18nRenderLang = _lang;
+        try { if (typeof window.reRenderChartsWithNewLanguage === 'function') window.reRenderChartsWithNewLanguage(); } catch (e) {}
+      } else {
+        // Mesmo idioma: apenas re-traduz labels dos charts já existentes,
+        // sem re-render de dashboard/estudos.
+        try { if (typeof window._retranslateChartsInPlace === 'function') window._retranslateChartsInPlace(); } catch (e) {}
+      }
+      try { window.dispatchEvent(new CustomEvent('i18n:changed', { detail: { lang: _lang } })); } catch (e) {}
     };
 
-    // Re-traduz elementos vivos em memória: títulos, legendas e labels dos gráficos
-    // Chart.js (CH, DASH_CH, CM_MODAL_CH, CM_SPARKS) + re-renderização de dashboard,
-    // estudos, análise e relatórios. Chamada ao final de applyI18nToDOM().
-    window.reRenderChartsWithNewLanguage = function() {
+    // Retradução em memória dos gráficos Chart.js (títulos, legendas, labels)
+    // sem destruir/recriar canvas.
+    window._retranslateChartsInPlace = function() {
       var dict = (i18nFlatDict && typeof i18nFlatDict === 'object') ? i18nFlatDict : {};
       function tr(v) { return (typeof v === 'string' && dict[v]) ? dict[v] : v; }
       function retranslateChart(ch) {
@@ -225,32 +235,45 @@ function initSupabaseClient() {
           });
           if (ch.data && Array.isArray(ch.data.datasets)) {
             ch.data.datasets.forEach(function(ds){
-              if (!ds) return;
-              if (typeof ds.label === 'string') {
+              if (ds && typeof ds.label === 'string') {
                 if (typeof ds._origLabel !== 'string') ds._origLabel = ds.label;
                 ds.label = tr(ds._origLabel);
               }
             });
           }
           ch.update('none');
-        } catch (e) { /* silencioso */ }
+        } catch (e) {}
       }
+      var groups = [];
+      try { if (typeof CH !== 'undefined') groups.push(CH); } catch(e){}
+      try { if (typeof DASH_CH !== 'undefined') groups.push(DASH_CH); } catch(e){}
+      try { if (typeof CM_MODAL_CH !== 'undefined') groups.push(CM_MODAL_CH); } catch(e){}
+      try { if (typeof CM_SPARKS !== 'undefined') groups.push(CM_SPARKS); } catch(e){}
+      groups.forEach(function(g){
+        if (!g) return;
+        Object.keys(g).forEach(function(k){ retranslateChart(g[k]); });
+      });
+    };
+
+    // Re-render completo — chamado UMA VEZ por troca de idioma. Usa trava
+    // de reentrância para evitar corridas de canvas.
+    window.reRenderChartsWithNewLanguage = function() {
+      if (window.__chartReRenderRunning) return;
+      window.__chartReRenderRunning = true;
       try {
-        var groups = [];
-        if (typeof CH !== 'undefined') groups.push(CH);
-        if (typeof DASH_CH !== 'undefined') groups.push(DASH_CH);
-        if (typeof CM_MODAL_CH !== 'undefined') groups.push(CM_MODAL_CH);
-        if (typeof CM_SPARKS !== 'undefined') groups.push(CM_SPARKS);
-        groups.forEach(function(g){
-          if (!g) return;
-          Object.keys(g).forEach(function(k){ retranslateChart(g[k]); });
-        });
-      } catch (e) {}
-      try { if (typeof window.renderDashboard === 'function') window.renderDashboard(); } catch (e) {}
-      try { if (typeof window.renderStudies === 'function') window.renderStudies(); } catch (e) {}
-      try { if (typeof window.renderStudyList === 'function') window.renderStudyList(); } catch (e) {}
-      try { if (typeof window.renderReports === 'function') window.renderReports(); } catch (e) {}
-      try { if (typeof window.renderAnalysis === 'function' && typeof lastStats !== 'undefined' && lastStats) window.renderAnalysis(); } catch (e) {}
+        // 1) Retraduz em memória o que já existe (não recria canvas).
+        try { window._retranslateChartsInPlace(); } catch (e) {}
+        // 2) Re-renderiza componentes de nível alto que geram HTML/labels
+        //    a partir de strings — sem destruir canvas ativos manualmente,
+        //    porque essas funções já fazem destroy()+create() internamente.
+        try { if (typeof window.renderDashboard === 'function') window.renderDashboard(); } catch (e) {}
+        try { if (typeof window.renderStudies === 'function') window.renderStudies(); } catch (e) {}
+        try { if (typeof window.renderStudyList === 'function') window.renderStudyList(); } catch (e) {}
+        try { if (typeof window.renderReports === 'function') window.renderReports(); } catch (e) {}
+        try { if (typeof window.renderAnalysis === 'function' && typeof lastStats !== 'undefined' && lastStats) window.renderAnalysis(); } catch (e) {}
+      } finally {
+        setTimeout(function(){ window.__chartReRenderRunning = false; }, 0);
+      }
     };
 
     window.t = function(key, fallback) {
@@ -669,7 +692,6 @@ function initSupabaseClient() {
           _currentPlant = plant || null;
           window.currentPlant = _currentPlant;
           if (_currentProfile) _currentProfile.activePlantId = _currentPlant && _currentPlant.id;
-          // Reatividade: dispara re-tradução instantânea sempre que a planta ativa muda.
           try {
             var _lang = (plant && plant.language_code) || 'pt-BR';
             if (typeof window._safeApplyI18n === 'function') {
