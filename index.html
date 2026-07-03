@@ -9101,5 +9101,370 @@ window.clearBrandingLogo = function() {
 })();
 </script>
 
+<!-- ===== i18n ADDENDUM PATCH v2 — static HTML strings + attribute translation ===== -->
+<script>
+(function(){
+  'use strict';
+
+  /* ── Addendum dictionary: strings found in STATIC HTML that were missing ── */
+  var _EXTRA2 = {
+
+    'en-US': {
+      /* topbar */
+      'Resetar':'Reset',
+      'Salvar Estudo':'Save Study',
+      'Salvar como Cópia':'Save as Copy',
+      '✏ Editando cópia':'✏ Editing copy',
+      'Imprimir':'Print',
+      '🚪 Sair':'🚪 Sign out',
+      /* topbar titles */
+      'Casas decimais dos resultados':'Decimal places of results',
+      'Salva como um novo estudo separado':'Save as a separate new study',
+      'Exportar backup .json':'Export backup .json',
+      'Restaurar backup .json':'Restore backup .json',
+      'Logotipo e dados da empresa':'Company logo and data',
+      'Sair da conta':'Sign out',
+      'Trocar planta':'Switch plant',
+      'Copiar todos os valores':'Copy all values',
+      'Desfazer último':'Undo last',
+      /* form section headers */
+      'Identificação da Peça':'Part Identification',
+      'Especificação':'Specification',
+      'Responsável & Data':'Responsible & Date',
+      'Dados de Medição':'Measurement Data',
+      /* simulator */
+      'Faixa Real Medida':'Actual Measured Range',
+      'Configuração da Geração':'Generation Configuration',
+      '📏 Limites RÍGIDOS: TODOS os valores gerados ficarão entre Mín e Máx. As casas decimais seguem a precisão informada nos campos.':
+        '📏 RIGID Limits: ALL generated values will be between Min and Max. Decimal places follow the precision entered in the fields.',
+      'Valor mínimo encontrado':'Minimum value found',
+      'Valor máximo encontrado':'Maximum value found',
+      'Qtd. amostras (N)':'Qty. samples (N)',
+      'Cpk alvo mínimo':'Minimum target Cpk',
+      'Gerar Amostras Capazes':'Generate Capable Samples',
+      '1.33 — Aceitável':'1.33 — Acceptable',
+      '1.67 — Excelente ★':'1.67 — Excellent ★',
+      '2.00 — Classe Mundial':'2.00 — World Class',
+      '⎘ Copiar':'⎘ Copy',
+      '✕ Limpar':'✕ Clear',
+      /* studies page */
+      '📁 Estudos Salvos':'📁 Saved Studies',
+      'Buscar por PN, nome\u2026':'Search by PN, name\u2026'
+    },
+
+    'es-MX': {
+      'Resetar':'Restablecer',
+      'Salvar Estudo':'Guardar Estudio',
+      'Salvar como Cópia':'Guardar como Copia',
+      '✏ Editando cópia':'✏ Editando copia',
+      'Imprimir':'Imprimir',
+      '🚪 Sair':'🚪 Salir',
+      'Casas decimais dos resultados':'Decimales de los resultados',
+      'Salva como um novo estudo separado':'Guardar como un nuevo estudio separado',
+      'Exportar backup .json':'Exportar respaldo .json',
+      'Restaurar backup .json':'Restaurar respaldo .json',
+      'Logotipo e dados da empresa':'Logotipo y datos de la empresa',
+      'Sair da conta':'Salir de la cuenta',
+      'Trocar planta':'Cambiar planta',
+      'Copiar todos os valores':'Copiar todos los valores',
+      'Desfazer último':'Deshacer último',
+      'Identificação da Peça':'Identificación de la Pieza',
+      'Especificação':'Especificación',
+      'Responsável & Data':'Responsable y Fecha',
+      'Dados de Medição':'Datos de Medición',
+      'Faixa Real Medida':'Rango Real Medido',
+      'Configuração da Geração':'Configuración de Generación',
+      '📏 Limites RÍGIDOS: TODOS os valores gerados ficarão entre Mín e Máx. As casas decimais seguem a precisão informada nos campos.':
+        '📏 Límites RÍGIDOS: TODOS los valores generados estarán entre Mín y Máx. Los decimales siguen la precisión indicada en los campos.',
+      'Valor mínimo encontrado':'Valor mínimo encontrado',
+      'Valor máximo encontrado':'Valor máximo encontrado',
+      'Qtd. amostras (N)':'Cant. muestras (N)',
+      'Cpk alvo mínimo':'Cpk mínimo objetivo',
+      'Gerar Amostras Capazes':'Generar Muestras Capaces',
+      '1.33 — Aceitável':'1.33 — Aceptable',
+      '1.67 — Excelente ★':'1.67 — Excelente ★',
+      '2.00 — Classe Mundial':'2.00 — Clase Mundial',
+      '⎘ Copiar':'⎘ Copiar',
+      '✕ Limpar':'✕ Limpiar',
+      '📁 Estudos Salvos':'📁 Estudios Guardados',
+      'Buscar por PN, nome\u2026':'Buscar por PN, nombre\u2026'
+    },
+
+    'es-ES': {
+      'Resetar':'Restablecer',
+      'Salvar Estudo':'Guardar Estudio',
+      'Salvar como Cópia':'Guardar como Copia',
+      '✏ Editando cópia':'✏ Editando copia',
+      'Imprimir':'Imprimir',
+      '🚪 Sair':'🚪 Salir',
+      'Casas decimais dos resultados':'Decimales de los resultados',
+      'Salva como um novo estudo separado':'Guardar como un nuevo estudio separado',
+      'Exportar backup .json':'Exportar respaldo .json',
+      'Restaurar backup .json':'Restaurar respaldo .json',
+      'Logotipo e dados da empresa':'Logotipo y datos de la empresa',
+      'Sair da conta':'Salir de la cuenta',
+      'Trocar planta':'Cambiar planta',
+      'Copiar todos os valores':'Copiar todos los valores',
+      'Desfazer último':'Deshacer último',
+      'Identificação da Peça':'Identificación de la Pieza',
+      'Especificação':'Especificación',
+      'Responsável & Data':'Responsable y Fecha',
+      'Dados de Medição':'Datos de Medición',
+      'Faixa Real Medida':'Rango Real Medido',
+      'Configuração da Geração':'Configuración de Generación',
+      '📏 Limites RÍGIDOS: TODOS os valores gerados ficarão entre Mín e Máx. As casas decimais seguem a precisão informada nos campos.':
+        '📏 Límites RÍGIDOS: TODOS los valores generados estarán entre Mín y Máx. Los decimales siguen la precisión indicada en los campos.',
+      'Valor mínimo encontrado':'Valor mínimo encontrado',
+      'Valor máximo encontrado':'Valor máximo encontrado',
+      'Qtd. amostras (N)':'Cant. muestras (N)',
+      'Cpk alvo mínimo':'Cpk mínimo objetivo',
+      'Gerar Amostras Capazes':'Generar Muestras Capaces',
+      '1.33 — Aceitável':'1.33 — Aceptable',
+      '1.67 — Excelente ★':'1.67 — Excelente ★',
+      '2.00 — Classe Mundial':'2.00 — Clase Mundial',
+      '⎘ Copiar':'⎘ Copiar',
+      '✕ Limpar':'✕ Limpiar',
+      '📁 Estudos Salvos':'📁 Estudios Guardados',
+      'Buscar por PN, nome\u2026':'Buscar por PN, nombre\u2026'
+    },
+
+    'fr-FR': {
+      'Resetar':'Réinitialiser',
+      'Salvar Estudo':"Sauvegarder l'étude",
+      'Salvar como Cópia':'Sauvegarder comme copie',
+      '✏ Editando cópia':'✏ Modif. copie',
+      'Imprimir':'Imprimer',
+      '🚪 Sair':'🚪 Déconnexion',
+      'Casas decimais dos resultados':'Décimales des résultats',
+      'Salva como um novo estudo separado':'Enregistrer comme nouvelle étude séparée',
+      'Exportar backup .json':'Exporter sauvegarde .json',
+      'Restaurar backup .json':'Restaurer sauvegarde .json',
+      'Logotipo e dados da empresa':'Logo et données de l\'entreprise',
+      'Sair da conta':'Se déconnecter',
+      'Trocar planta':'Changer d\'usine',
+      'Copiar todos os valores':'Copier toutes les valeurs',
+      'Desfazer último':'Annuler le dernier',
+      'Identificação da Peça':'Identification de la Pièce',
+      'Especificação':'Spécification',
+      'Responsável & Data':'Responsable & Date',
+      'Dados de Medição':'Données de Mesure',
+      'Faixa Real Medida':'Plage Réelle Mesurée',
+      'Configuração da Geração':'Configuration de Génération',
+      '📏 Limites RÍGIDOS: TODOS os valores gerados ficarão entre Mín e Máx. As casas decimais seguem a precisão informada nos campos.':
+        '📏 Limites RIGIDES: TOUTES les valeurs générées seront entre Min et Max. Les décimales suivent la précision saisie dans les champs.',
+      'Valor mínimo encontrado':'Valeur minimale trouvée',
+      'Valor máximo encontrado':'Valeur maximale trouvée',
+      'Qtd. amostras (N)':'Qté. échantillons (N)',
+      'Cpk alvo mínimo':'Cpk cible minimum',
+      'Gerar Amostras Capazes':'Générer Échantillons Capables',
+      '1.33 — Aceitável':'1,33 — Acceptable',
+      '1.67 — Excelente ★':'1,67 — Excellent ★',
+      '2.00 — Classe Mundial':'2,00 — Classe Mondiale',
+      '⎘ Copiar':'⎘ Copier',
+      '✕ Limpar':'✕ Effacer',
+      '📁 Estudos Salvos':'📁 Études Sauvegardées',
+      'Buscar por PN, nome\u2026':'Rechercher par PN, nom\u2026'
+    },
+
+    'it-IT': {
+      'Resetar':'Reimposta',
+      'Salvar Estudo':'Salva studio',
+      'Salvar como Cópia':'Salva come copia',
+      '✏ Editando cópia':'✏ Modifica copia',
+      'Imprimir':'Stampa',
+      '🚪 Sair':'🚪 Esci',
+      'Casas decimais dos resultados':'Decimali dei risultati',
+      'Salva como um novo estudo separado':'Salva come nuovo studio separato',
+      'Exportar backup .json':'Esporta backup .json',
+      'Restaurar backup .json':'Ripristina backup .json',
+      'Logotipo e dados da empresa':'Logo e dati aziendali',
+      'Sair da conta':'Esci dall\'account',
+      'Trocar planta':'Cambia stabilimento',
+      'Copiar todos os valores':'Copia tutti i valori',
+      'Desfazer último':'Annulla ultimo',
+      'Identificação da Peça':'Identificazione Pezzo',
+      'Especificação':'Specifica',
+      'Responsável & Data':'Responsabile & Data',
+      'Dados de Medição':'Dati di Misurazione',
+      'Faixa Real Medida':'Intervallo Reale Misurato',
+      'Configuração da Geração':'Configurazione Generazione',
+      '📏 Limites RÍGIDOS: TODOS os valores gerados ficarão entre Mín e Máx. As casas decimais seguem a precisão informada nos campos.':
+        '📏 Limiti RIGIDI: TUTTI i valori generati saranno tra Min e Max. I decimali seguono la precisione inserita nei campi.',
+      'Valor mínimo encontrado':'Valore minimo trovato',
+      'Valor máximo encontrado':'Valore massimo trovato',
+      'Qtd. amostras (N)':'Quantità campioni (N)',
+      'Cpk alvo mínimo':'Cpk minimo obiettivo',
+      'Gerar Amostras Capazes':'Genera Campioni Capaci',
+      '1.33 — Aceitável':'1,33 — Accettabile',
+      '1.67 — Excelente ★':'1,67 — Eccellente ★',
+      '2.00 — Classe Mundial':'2,00 — Classe Mondiale',
+      '⎘ Copiar':'⎘ Copia',
+      '✕ Limpar':'✕ Cancella',
+      '📁 Estudos Salvos':'📁 Studi Salvati',
+      'Buscar por PN, nome\u2026':'Cerca per PN, nome\u2026'
+    },
+
+    'en-GB': {
+      'Resetar':'Reset',
+      'Salvar Estudo':'Save Study',
+      'Salvar como Cópia':'Save as Copy',
+      '✏ Editando cópia':'✏ Editing copy',
+      'Imprimir':'Print',
+      '🚪 Sair':'🚪 Sign out',
+      'Casas decimais dos resultados':'Decimal places of results',
+      'Salva como um novo estudo separado':'Save as a separate new study',
+      'Exportar backup .json':'Export backup .json',
+      'Restaurar backup .json':'Restore backup .json',
+      'Logotipo e dados da empresa':'Company logo and data',
+      'Sair da conta':'Sign out',
+      'Trocar planta':'Switch plant',
+      'Copiar todos os valores':'Copy all values',
+      'Desfazer último':'Undo last',
+      'Identificação da Peça':'Part Identification',
+      'Especificação':'Specification',
+      'Responsável & Data':'Responsible & Date',
+      'Dados de Medição':'Measurement Data',
+      'Faixa Real Medida':'Actual Measured Range',
+      'Configuração da Geração':'Generation Configuration',
+      '📏 Limites RÍGIDOS: TODOS os valores gerados ficarão entre Mín e Máx. As casas decimais seguem a precisão informada nos campos.':
+        '📏 RIGID Limits: ALL generated values will be between Min and Max. Decimal places follow the precision entered in the fields.',
+      'Valor mínimo encontrado':'Minimum value found',
+      'Valor máximo encontrado':'Maximum value found',
+      'Qtd. amostras (N)':'Qty. samples (N)',
+      'Cpk alvo mínimo':'Minimum target Cpk',
+      'Gerar Amostras Capazes':'Generate Capable Samples',
+      '1.33 — Aceitável':'1.33 — Acceptable',
+      '1.67 — Excelente ★':'1.67 — Excellent ★',
+      '2.00 — Classe Mundial':'2.00 — World Class',
+      '⎘ Copiar':'⎘ Copy',
+      '✕ Limpar':'✕ Clear',
+      '📁 Estudos Salvos':'📁 Saved Studies',
+      'Buscar por PN, nome\u2026':'Search by PN, name\u2026'
+    },
+
+    'de-DE': {
+      'Resetar':'Zurücksetzen',
+      'Salvar Estudo':'Studie speichern',
+      'Salvar como Cópia':'Als Kopie speichern',
+      '✏ Editando cópia':'✏ Kopie bearbeiten',
+      'Imprimir':'Drucken',
+      '🚪 Sair':'🚪 Abmelden',
+      'Casas decimais dos resultados':'Dezimalstellen der Ergebnisse',
+      'Salva como um novo estudo separado':'Als neue separate Studie speichern',
+      'Exportar backup .json':'Backup .json exportieren',
+      'Restaurar backup .json':'Backup .json wiederherstellen',
+      'Logotipo e dados da empresa':'Firmenlogo und Daten',
+      'Sair da conta':'Konto abmelden',
+      'Trocar planta':'Werk wechseln',
+      'Copiar todos os valores':'Alle Werte kopieren',
+      'Desfazer último':'Letzten rückgängig',
+      'Identificação da Peça':'Teileidentifikation',
+      'Especificação':'Spezifikation',
+      'Responsável & Data':'Verantwortlicher & Datum',
+      'Dados de Medição':'Messdaten',
+      'Faixa Real Medida':'Tatsächlicher Messbereich',
+      'Configuração da Geração':'Generierungskonfiguration',
+      '📏 Limites RÍGIDOS: TODOS os valores gerados ficarão entre Mín e Máx. As casas decimais seguem a precisão informada nos campos.':
+        '📏 STARRE Grenzen: ALLE generierten Werte liegen zwischen Min und Max. Dezimalstellen folgen der eingegebenen Genauigkeit.',
+      'Valor mínimo encontrado':'Kleinster Messwert',
+      'Valor máximo encontrado':'Größter Messwert',
+      'Qtd. amostras (N)':'Anz. Messungen (N)',
+      'Cpk alvo mínimo':'Mindest-Cpk-Ziel',
+      'Gerar Amostras Capazes':'Fähige Messwerte generieren',
+      '1.33 — Aceitável':'1,33 — Akzeptabel',
+      '1.67 — Excelente ★':'1,67 — Hervorragend ★',
+      '2.00 — Classe Mundial':'2,00 — Weltklasse',
+      '⎘ Copiar':'⎘ Kopieren',
+      '✕ Limpar':'✕ Löschen',
+      '📁 Estudos Salvos':'📁 Gespeicherte Studien',
+      'Buscar por PN, nome\u2026':'Suche nach PN, Name\u2026'
+    }
+
+  };
+
+  /* ── Merge _EXTRA2 into _DYNTRAD (only new keys) ── */
+  if (window._DYNTRAD) {
+    Object.keys(_EXTRA2).forEach(function(lang) {
+      if (!window._DYNTRAD[lang]) {
+        window._DYNTRAD[lang] = _EXTRA2[lang];
+      } else {
+        var target = window._DYNTRAD[lang];
+        var src = _EXTRA2[lang];
+        Object.keys(src).forEach(function(k) {
+          if (!Object.prototype.hasOwnProperty.call(target, k)) target[k] = src[k];
+        });
+      }
+    });
+  }
+
+  /* ── Re-merge into i18nFlatDict for current language ── */
+  function _reMergeCurrent() {
+    var lang = (window.__currentLang || document.documentElement.lang || 'pt-BR').replace('_','-');
+    if (!lang || lang === 'pt-BR') return;
+    var src = window._DYNTRAD && window._DYNTRAD[lang];
+    if (!src) return;
+    if (!window.i18nFlatDict) window.i18nFlatDict = {};
+    Object.keys(src).forEach(function(k) { window.i18nFlatDict[k] = src[k]; });
+  }
+  _reMergeCurrent();
+
+  /* ── Translate placeholder / title / aria-label attributes ── */
+  function _translateAttributes() {
+    var lang = (window.__currentLang || document.documentElement.lang || 'pt-BR').replace('_','-');
+    if (!lang || lang === 'pt-BR') return;
+    var dict = window.i18nFlatDict || {};
+
+    document.querySelectorAll('[placeholder]').forEach(function(el) {
+      var orig = el.getAttribute('data-orig-ph') || el.getAttribute('placeholder');
+      if (!orig) return;
+      if (!el.hasAttribute('data-orig-ph')) el.setAttribute('data-orig-ph', orig);
+      if (dict[orig]) el.setAttribute('placeholder', dict[orig]);
+    });
+
+    document.querySelectorAll('[title]').forEach(function(el) {
+      var orig = el.getAttribute('data-orig-title') || el.getAttribute('title');
+      if (!orig) return;
+      if (!el.hasAttribute('data-orig-title')) el.setAttribute('data-orig-title', orig);
+      if (dict[orig]) el.setAttribute('title', dict[orig]);
+    });
+  }
+
+  /* ── Re-run text-node walker on static DOM regions ── */
+  function _reWalkStatic() {
+    if (typeof window._translateTextNodes === 'function') {
+      window._translateTextNodes(document.body);
+    }
+  }
+
+  /* ── Hook into existing applyI18n override (run after existing logic) ── */
+  var _prevApplyV2 = window.applyI18n;
+  window.applyI18n = function(code) {
+    var r;
+    try { if (typeof _prevApplyV2 === 'function') r = _prevApplyV2.apply(this, arguments); } catch(e){}
+    try { _reMergeCurrent(); } catch(e){}
+    try { _translateAttributes(); } catch(e){}
+    try { _reWalkStatic(); } catch(e){}
+    return r;
+  };
+
+  /* ── Run immediately for current session language ── */
+  _reMergeCurrent();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      _translateAttributes();
+      _reWalkStatic();
+    });
+  } else {
+    _translateAttributes();
+    _reWalkStatic();
+  }
+
+  /* ── Also re-run 1s and 2s after page load (handles late renders) ── */
+  setTimeout(function(){ _reMergeCurrent(); _translateAttributes(); _reWalkStatic(); }, 1000);
+  setTimeout(function(){ _reMergeCurrent(); _translateAttributes(); _reWalkStatic(); }, 2000);
+
+})();
+</script>
+
 </body>
 </html>
