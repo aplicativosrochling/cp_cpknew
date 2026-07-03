@@ -87,6 +87,9 @@ function initSupabaseClient() {
     // ============================================================
     
     async function loadTranslationsFromDatabase(languageCode) {
+      // Limpa completamente os dicionários para evitar resíduos do idioma anterior.
+      i18nStrings = {};
+      i18nFlatDict = {};
       try {
         var { data, error } = await supabaseClient
           .from('translations')
@@ -191,6 +194,63 @@ function initSupabaseClient() {
       });
 
       _translateTextNodes();
+      try { if (typeof window.reRenderChartsWithNewLanguage === 'function') window.reRenderChartsWithNewLanguage(); } catch (e) {}
+      try { window.dispatchEvent(new CustomEvent('i18n:changed', { detail: { lang: _currentLanguage } })); } catch (e) {}
+    };
+
+    // Re-traduz elementos vivos em memória: títulos, legendas e labels dos gráficos
+    // Chart.js (CH, DASH_CH, CM_MODAL_CH, CM_SPARKS) + re-renderização de dashboard,
+    // estudos, análise e relatórios. Chamada ao final de applyI18nToDOM().
+    window.reRenderChartsWithNewLanguage = function() {
+      var dict = (i18nFlatDict && typeof i18nFlatDict === 'object') ? i18nFlatDict : {};
+      function tr(v) { return (typeof v === 'string' && dict[v]) ? dict[v] : v; }
+      function retranslateChart(ch) {
+        if (!ch || typeof ch.update !== 'function') return;
+        try {
+          var opts = ch.options || {};
+          if (opts.plugins && opts.plugins.title && typeof opts.plugins.title.text === 'string') {
+            if (typeof ch._origTitle !== 'string') ch._origTitle = opts.plugins.title.text;
+            opts.plugins.title.text = tr(ch._origTitle);
+          }
+          if (opts.plugins && opts.plugins.legend && opts.plugins.legend.title && typeof opts.plugins.legend.title.text === 'string') {
+            if (typeof ch._origLegendTitle !== 'string') ch._origLegendTitle = opts.plugins.legend.title.text;
+            opts.plugins.legend.title.text = tr(ch._origLegendTitle);
+          }
+          ['x','y','r'].forEach(function(axis){
+            var sc = opts.scales && opts.scales[axis];
+            if (sc && sc.title && typeof sc.title.text === 'string') {
+              sc._origTitle = (typeof sc._origTitle === 'string') ? sc._origTitle : sc.title.text;
+              sc.title.text = tr(sc._origTitle);
+            }
+          });
+          if (ch.data && Array.isArray(ch.data.datasets)) {
+            ch.data.datasets.forEach(function(ds){
+              if (!ds) return;
+              if (typeof ds.label === 'string') {
+                if (typeof ds._origLabel !== 'string') ds._origLabel = ds.label;
+                ds.label = tr(ds._origLabel);
+              }
+            });
+          }
+          ch.update('none');
+        } catch (e) { /* silencioso */ }
+      }
+      try {
+        var groups = [];
+        if (typeof CH !== 'undefined') groups.push(CH);
+        if (typeof DASH_CH !== 'undefined') groups.push(DASH_CH);
+        if (typeof CM_MODAL_CH !== 'undefined') groups.push(CM_MODAL_CH);
+        if (typeof CM_SPARKS !== 'undefined') groups.push(CM_SPARKS);
+        groups.forEach(function(g){
+          if (!g) return;
+          Object.keys(g).forEach(function(k){ retranslateChart(g[k]); });
+        });
+      } catch (e) {}
+      try { if (typeof window.renderDashboard === 'function') window.renderDashboard(); } catch (e) {}
+      try { if (typeof window.renderStudies === 'function') window.renderStudies(); } catch (e) {}
+      try { if (typeof window.renderStudyList === 'function') window.renderStudyList(); } catch (e) {}
+      try { if (typeof window.renderReports === 'function') window.renderReports(); } catch (e) {}
+      try { if (typeof window.renderAnalysis === 'function' && typeof lastStats !== 'undefined' && lastStats) window.renderAnalysis(); } catch (e) {}
     };
 
     window.t = function(key, fallback) {
@@ -258,17 +318,29 @@ function initSupabaseClient() {
         var raw = node.nodeValue;
         var trimmed = raw.trim();
         if (!trimmed) return;
-        var translated = (dbDict && dbDict[trimmed]) || (builtinDict && builtinDict[trimmed]);
+        if (typeof node._originalText !== 'string') {
+          node._originalText = trimmed;
+        }
+        var lookupKey = node._originalText;
+        var translated = (dbDict && dbDict[lookupKey]) || (builtinDict && builtinDict[lookupKey]);
+        var leading = raw.match(/^\s*/)[0];
+        var trailing = raw.match(/\s*$/)[0];
         if (translated) {
-          node.nodeValue = raw.replace(trimmed, translated);
+          node.nodeValue = leading + translated + trailing;
+        } else if (lookupKey && node.nodeValue.trim() !== lookupKey) {
+          node.nodeValue = leading + lookupKey + trailing;
         }
       });
 
       document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach(function(el) {
         var ph = el.getAttribute('placeholder');
-        if (!ph) return;
-        var trPh = (dbDict && dbDict[ph]) || (builtinDict && builtinDict[ph]);
-        if (trPh) el.setAttribute('placeholder', trPh);
+        if (!ph && !el._originalPlaceholder) return;
+        if (typeof el._originalPlaceholder !== 'string') {
+          el._originalPlaceholder = ph;
+        }
+        var key = el._originalPlaceholder;
+        var trPh = (dbDict && dbDict[key]) || (builtinDict && builtinDict[key]);
+        el.setAttribute('placeholder', trPh || key || '');
       });
     };
 
@@ -597,6 +669,15 @@ function initSupabaseClient() {
           _currentPlant = plant || null;
           window.currentPlant = _currentPlant;
           if (_currentProfile) _currentProfile.activePlantId = _currentPlant && _currentPlant.id;
+          // Reatividade: dispara re-tradução instantânea sempre que a planta ativa muda.
+          try {
+            var _lang = (plant && plant.language_code) || 'pt-BR';
+            if (typeof window._safeApplyI18n === 'function') {
+              Promise.resolve(window._safeApplyI18n(_lang)).catch(function(e){
+                console.warn('[i18n] setCurrentPlant _safeApplyI18n falhou:', e);
+              });
+            }
+          } catch (e) { console.warn('[i18n] setCurrentPlant erro:', e); }
         },
 
         getCurrentPlant: function() {
