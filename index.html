@@ -2496,7 +2496,7 @@ body {
             <div style="position:relative;height:260px"><canvas id="dashScatter"></canvas></div>
           </div>
           <div class="dash-card premium">
-            <div class="dash-card-title">Top 10 Part Numbers por Cpk</div>
+            <div class="dash-card-title">Top 10 Códigos de Produto por Cpk</div>
             <div style="position:relative;height:260px"><canvas id="dashTop"></canvas></div>
           </div>
           <div class="dash-card premium">
@@ -2506,7 +2506,7 @@ body {
         </div>
 
         <div class="dash-card premium">
-          <div class="dash-card-title">Quantidade de Estudos por Part Number</div>
+          <div class="dash-card-title">Quantidade de Estudos por Código de Produto</div>
           <div style="position:relative;height:340px"><canvas id="dashStudiesByPN"></canvas></div>
         </div>
       </div>
@@ -2547,11 +2547,11 @@ body {
           </div>
           <div class="row2" style="margin-bottom:8px">
             <div class="field">
-              <div class="lbl lbl-req">Part Number</div>
+              <div class="lbl lbl-req">Código do Produto</div>
               <input type="text" id="iPN" placeholder="Ex: ABC-12345"/>
             </div>
             <div class="field">
-              <div class="lbl lbl-req">Part Name</div>
+              <div class="lbl lbl-req">Nome do Produto</div>
               <input type="text" id="iPartName" placeholder="Ex: Eixo Principal"/>
             </div>
           </div>
@@ -2849,8 +2849,8 @@ body {
             </div>
           </div>
           <div class="study-meta-grid">
-            <div class="study-meta-item"><div class="study-meta-label">Part Number</div><div class="study-meta-value highlight" id="shPN">—</div></div>
-            <div class="study-meta-item"><div class="study-meta-label">Part Name</div><div class="study-meta-value" id="shPartName">—</div></div>
+            <div class="study-meta-item"><div class="study-meta-label">Código do Produto</div><div class="study-meta-value highlight" id="shPN">—</div></div>
+            <div class="study-meta-item"><div class="study-meta-label">Nome do Produto</div><div class="study-meta-value" id="shPartName">—</div></div>
             <div class="study-meta-item"><div class="study-meta-label">Característica</div><div class="study-meta-value" id="shCharCode">—</div></div>
             <div class="study-meta-item"><div class="study-meta-label">Nome Característica</div><div class="study-meta-value" id="shCharName">—</div></div>
             <div class="study-meta-item"><div class="study-meta-label">Especificado</div><div class="study-meta-value" id="shSpec">—</div></div>
@@ -3634,7 +3634,7 @@ function cmOpenStudy(id) {
   }).join('');
 
   document.getElementById('cmMMeta').innerHTML = [
-    { l: 'Part Number', v: study.pn || '—' },
+    { l: 'Código do Produto', v: study.pn || '—' },
     { l: 'Responsável', v: study.owner || '—' },
     { l: 'Data', v: study.date || '—' },
     { l: 'Equipamento', v: study.equip || '—' },
@@ -3795,7 +3795,7 @@ function _renderDashboardInner() {
     { lbl: 'Reprovados', val: failed, sub: 'Cpk < 1.33 · clique', cls: 'fail', flt: 'failed' },
     { lbl: 'Excelentes', val: excellent, sub: 'Cpk ≥ 1.67 · clique', cls: 'gold', flt: 'excellent' },
     { lbl: 'Cpk Médio', val: avgCpk != null ? avgCpk.toFixed(3) : '—', sub: 'Média geral · clique p/ ranking', cls: avgCpk == null ? '' : avgCpk >= 1.67 ? 'gold' : avgCpk >= 1.33 ? 'ok' : avgCpk >= 1 ? 'warn' : 'fail', flt: 'all' },
-    { lbl: 'Part Numbers', val: uniquePN, sub: 'Únicos · clique', cls: '', flt: 'all' }
+    { lbl: 'Códigos de Produto', val: uniquePN, sub: 'Únicos · clique', cls: '', flt: 'all' }
   ];
   document.getElementById('kpiGrid').innerHTML = kpis.map(function(k) {
     return '<div class="kpi-card ' + k.cls + '" style="cursor:pointer" onclick="openFilteredStudies(\'' + k.flt + '\',\'' + k.lbl + '\')" title="Clique para ver tabela detalhada">' +
@@ -4780,7 +4780,7 @@ function updateStatsTable(st) {
   var stypeLabel = specType === 'bilateral' ? t('stats.val.bilateral', 'Bilateral (LSL+USL)') : specType === 'usl-only' ? t('stats.val.uslOnly', 'Unilateral Superior (≤USL)') : t('stats.val.lslOnly', 'Unilateral Inferior (≥LSL)');
 
   R.push(sec(t('stats.sec.id', '📋 Identificação do Estudo')));
-  R.push(row('Part Number', pn, '—', t('stats.interp.partRef', 'Referência da peça'), mkBadge(t('stats.badge.ok', 'OK'), 'info')));
+  R.push(row(t('stats.label.partNumber', 'Código do Produto'), pn, '—', t('stats.interp.partRef', 'Referência da peça'), mkBadge(t('stats.badge.ok', 'OK'), 'info')));
   R.push(row(t('stats.label.characteristic', 'Característica'), cn, '—', t('stats.interp.charName', 'Nome da característica medida'), mkBadge(t('stats.badge.ok', 'OK'), 'info')));
   R.push(row(t('stats.label.specBy', 'Especificação (por)'), specBy, '—', t('stats.interp.specRef', 'Norma/Desenho de referência'), mkBadge(t('stats.badge.info', 'Info'), 'info')));
   R.push(row(t('stats.label.unit', 'Unidade de Medida'), unit, '—', t('stats.interp.dataUnit', 'Unidade dos dados'), mkBadge(t('stats.badge.info', 'Info'), 'info')));
@@ -5890,8 +5890,8 @@ async function openStudyModal(id) {
   document.getElementById('modalBody').innerHTML =
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-bottom:16px">' +
     [
-      ['Part Number', s.pn],
-      ['Part Name', s.pname],
+      ['Código do Produto', s.pn],
+      ['Nome do Produto', s.pname],
       ['Característica', s.cc],
       ['Nome Caract.', s.cn],
       ['Especificado', s.specBy],
@@ -9872,6 +9872,111 @@ window.clearBrandingLogo = function() {
 
   setTimeout(function(){ _reMerge3(); if(typeof window._translateTextNodes==='function') window._translateTextNodes(document.body); if(typeof window._translateAttributes==='function') window._translateAttributes(); }, 1200);
   setTimeout(function(){ _reMerge3(); if(typeof window._translateTextNodes==='function') window._translateTextNodes(document.body); if(typeof window._translateAttributes==='function') window._translateAttributes(); _patchSimFragments(); }, 2500);
+
+})();
+</script>
+
+<!-- ===== i18n PATCH v4 — "Código do Produto" / "Nome do Produto" translations ===== -->
+<script>
+(function(){
+  'use strict';
+
+  var _EXTRA4 = {
+    'en-US': {
+      'Código do Produto':'Product Code',
+      'Nome do Produto':'Product Name',
+      'Códigos de Produto':'Product Codes',
+      'Top 10 Códigos de Produto por Cpk':'Top 10 Product Codes by Cpk',
+      'Quantidade de Estudos por Código de Produto':'Studies by Product Code'
+    },
+    'en-GB': {
+      'Código do Produto':'Product Code',
+      'Nome do Produto':'Product Name',
+      'Códigos de Produto':'Product Codes',
+      'Top 10 Códigos de Produto por Cpk':'Top 10 Product Codes by Cpk',
+      'Quantidade de Estudos por Código de Produto':'Studies by Product Code'
+    },
+    'es-MX': {
+      'Código do Produto':'Código del Producto',
+      'Nome do Produto':'Nombre del Producto',
+      'Códigos de Produto':'Códigos de Producto',
+      'Top 10 Códigos de Produto por Cpk':'Top 10 Códigos de Producto por Cpk',
+      'Quantidade de Estudos por Código de Produto':'Estudios por Código de Producto'
+    },
+    'es-ES': {
+      'Código do Produto':'Código del Producto',
+      'Nome do Produto':'Nombre del Producto',
+      'Códigos de Produto':'Códigos de Producto',
+      'Top 10 Códigos de Produto por Cpk':'Top 10 Códigos de Producto por Cpk',
+      'Quantidade de Estudos por Código de Produto':'Estudios por Código de Producto'
+    },
+    'fr-FR': {
+      'Código do Produto':'Code Produit',
+      'Nome do Produto':'Nom du Produit',
+      'Códigos de Produto':'Codes Produit',
+      'Top 10 Códigos de Produto por Cpk':'Top 10 Codes Produit par Cpk',
+      'Quantidade de Estudos por Código de Produto':'Études par Code Produit'
+    },
+    'it-IT': {
+      'Código do Produto':'Codice Prodotto',
+      'Nome do Produto':'Nome del Prodotto',
+      'Códigos de Produto':'Codici Prodotto',
+      'Top 10 Códigos de Produto por Cpk':'Top 10 Codici Prodotto per Cpk',
+      'Quantidade de Estudos por Código de Produto':'Studi per Codice Prodotto'
+    },
+    'de-DE': {
+      'Código do Produto':'Produktcode',
+      'Nome do Produto':'Produktname',
+      'Códigos de Produto':'Produktcodes',
+      'Top 10 Códigos de Produto por Cpk':'Top 10 Produktcodes nach Cpk',
+      'Quantidade de Estudos por Código de Produto':'Studien nach Produktcode'
+    }
+  };
+
+  /* merge into _DYNTRAD */
+  if (window._DYNTRAD) {
+    Object.keys(_EXTRA4).forEach(function(lang) {
+      if (!window._DYNTRAD[lang]) { window._DYNTRAD[lang] = _EXTRA4[lang]; return; }
+      var tgt = window._DYNTRAD[lang], src = _EXTRA4[lang];
+      Object.keys(src).forEach(function(k) {
+        if (!Object.prototype.hasOwnProperty.call(tgt, k)) tgt[k] = src[k];
+      });
+    });
+  }
+
+  /* flush into i18nFlatDict for current language */
+  function _flush4() {
+    var lang = (window.__currentLang || document.documentElement.lang || 'pt-BR').replace('_','-');
+    if (!lang || lang === 'pt-BR') return;
+    var src = window._DYNTRAD && window._DYNTRAD[lang];
+    if (!src) return;
+    if (!window.i18nFlatDict) window.i18nFlatDict = {};
+    Object.keys(src).forEach(function(k) { window.i18nFlatDict[k] = src[k]; });
+  }
+
+  /* hook into existing applyI18n chain */
+  var _prev4 = window.applyI18n;
+  window.applyI18n = function(code) {
+    var r;
+    try { if (typeof _prev4 === 'function') r = _prev4.apply(this, arguments); } catch(e){}
+    try { _flush4(); } catch(e){}
+    try { if (typeof window._translateTextNodes === 'function') window._translateTextNodes(document.body); } catch(e){}
+    try { if (typeof window._translateAttributes === 'function') window._translateAttributes(); } catch(e){}
+    return r;
+  };
+
+  _flush4();
+  if (document.readyState !== 'loading') {
+    if (typeof window._translateTextNodes === 'function') window._translateTextNodes(document.body);
+    if (typeof window._translateAttributes === 'function') window._translateAttributes();
+  } else {
+    document.addEventListener('DOMContentLoaded', function() {
+      _flush4();
+      if (typeof window._translateTextNodes === 'function') window._translateTextNodes(document.body);
+      if (typeof window._translateAttributes === 'function') window._translateAttributes();
+    });
+  }
+  setTimeout(function(){ _flush4(); if(typeof window._translateTextNodes==='function') window._translateTextNodes(document.body); }, 1500);
 
 })();
 </script>
