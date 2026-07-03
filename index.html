@@ -188,8 +188,15 @@ function initSupabaseClient() {
 
     window._translateTextNodes = function() {
       var lang = _currentLanguage || 'pt-BR';
-      var dict = window._DYNTRAD && window._DYNTRAD[lang];
-      if (!dict) return;
+      // 1) Dicionário vindo do Supabase (tabela translations) para o
+      //    idioma atual — permite adicionar QUALQUER idioma novo (chinês,
+      //    italiano, francês...) só inserindo linhas na tabela, sem
+      //    precisar editar código.
+      var dbDict = (i18nStrings && typeof i18nStrings === 'object') ? i18nStrings : null;
+      // 2) Dicionário embutido no código, usado como fallback quando a
+      //    tabela ainda não tem aquela chave/idioma.
+      var builtinDict = window._DYNTRAD && window._DYNTRAD[lang];
+      if (!dbDict && !builtinDict) return;
 
       var walker = document.createTreeWalker(
         document.body,
@@ -218,8 +225,9 @@ function initSupabaseClient() {
         var raw = node.nodeValue;
         var trimmed = raw.trim();
         if (!trimmed) return;
-        if (dict[trimmed]) {
-          node.nodeValue = raw.replace(trimmed, dict[trimmed]);
+        var translated = (dbDict && dbDict[trimmed]) || (builtinDict && builtinDict[trimmed]);
+        if (translated) {
+          node.nodeValue = raw.replace(trimmed, translated);
         }
       });
 
@@ -4593,52 +4601,52 @@ function updateStatsTable(st) {
   var cn = document.getElementById('iCharName').value || '—';
   var specBy = document.getElementById('iSpecBy').value || '—';
   var unit = document.getElementById('iUnit').value || '—';
-  var stypeLabel = specType === 'bilateral' ? 'Bilateral (LSL+USL)' : specType === 'usl-only' ? 'Unilateral Superior (≤USL)' : 'Unilateral Inferior (≥LSL)';
+  var stypeLabel = specType === 'bilateral' ? t('stats.val.bilateral', 'Bilateral (LSL+USL)') : specType === 'usl-only' ? t('stats.val.uslOnly', 'Unilateral Superior (≤USL)') : t('stats.val.lslOnly', 'Unilateral Inferior (≥LSL)');
 
-  R.push(sec('📋 Identificação do Estudo'));
-  R.push(row('Part Number', pn, '—', 'Referência da peça', mkBadge('OK', 'info')));
-  R.push(row('Característica', cn, '—', 'Nome da característica medida', mkBadge('OK', 'info')));
-  R.push(row('Especificação (por)', specBy, '—', 'Norma/Desenho de referência', mkBadge('Info', 'info')));
-  R.push(row('Unidade de Medida', unit, '—', 'Unidade dos dados', mkBadge('Info', 'info')));
-  R.push(row('Tipo de Estudo', stypeLabel, '—', 'Bilateral ou Unilateral', specType === 'bilateral' ? mkBadge('Bilateral', 'info') : mkBadge('Unilateral', 'warn')));
-  R.push(row('LSL', lsl != null ? f(lsl) : '—', '—', 'Limite inferior de especificação', lsl != null ? mkBadge('Definido', 'ok') : mkBadge('Não definido', 'dim')));
-  R.push(row('Target / Nominal', target != null ? f(target) : '—', '—', 'Valor nominal / alvo', target != null ? mkBadge('Definido', 'ok') : mkBadge('Não definido', 'dim')));
-  R.push(row('USL', usl != null ? f(usl) : '—', '—', 'Limite superior de especificação', usl != null ? mkBadge('Definido', 'ok') : mkBadge('Não definido', 'dim')));
-  if (lsl != null && usl != null) R.push(row('Tolerância Total', f(usl - lsl), '—', 'USL − LSL', mkBadge('Calculado', 'info')));
+  R.push(sec(t('stats.sec.id', '📋 Identificação do Estudo')));
+  R.push(row('Part Number', pn, '—', t('stats.interp.partRef', 'Referência da peça'), mkBadge(t('stats.badge.ok', 'OK'), 'info')));
+  R.push(row(t('stats.label.characteristic', 'Característica'), cn, '—', t('stats.interp.charName', 'Nome da característica medida'), mkBadge(t('stats.badge.ok', 'OK'), 'info')));
+  R.push(row(t('stats.label.specBy', 'Especificação (por)'), specBy, '—', t('stats.interp.specRef', 'Norma/Desenho de referência'), mkBadge(t('stats.badge.info', 'Info'), 'info')));
+  R.push(row(t('stats.label.unit', 'Unidade de Medida'), unit, '—', t('stats.interp.dataUnit', 'Unidade dos dados'), mkBadge(t('stats.badge.info', 'Info'), 'info')));
+  R.push(row(t('stats.label.studyType', 'Tipo de Estudo'), stypeLabel, '—', t('stats.interp.bilatUnilat', 'Bilateral ou Unilateral'), specType === 'bilateral' ? mkBadge(t('stats.badge.bilateral', 'Bilateral'), 'info') : mkBadge(t('stats.badge.unilateral', 'Unilateral'), 'warn')));
+  R.push(row('LSL', lsl != null ? f(lsl) : '—', '—', t('stats.interp.lsl', 'Limite inferior de especificação'), lsl != null ? mkBadge(t('stats.badge.defined', 'Definido'), 'ok') : mkBadge(t('stats.badge.notDefined', 'Não definido'), 'dim')));
+  R.push(row(t('stats.label.target', 'Target / Nominal'), target != null ? f(target) : '—', '—', t('stats.interp.target', 'Valor nominal / alvo'), target != null ? mkBadge(t('stats.badge.defined', 'Definido'), 'ok') : mkBadge(t('stats.badge.notDefined', 'Não definido'), 'dim')));
+  R.push(row('USL', usl != null ? f(usl) : '—', '—', t('stats.interp.usl', 'Limite superior de especificação'), usl != null ? mkBadge(t('stats.badge.defined', 'Definido'), 'ok') : mkBadge(t('stats.badge.notDefined', 'Não definido'), 'dim')));
+  if (lsl != null && usl != null) R.push(row(t('stats.label.totalTol', 'Tolerância Total'), f(usl - lsl), '—', 'USL − LSL', mkBadge(t('stats.badge.calculated', 'Calculado'), 'info')));
 
-  R.push(sec('📊 Estatísticas Descritivas', true));
-  R.push(row('Média (x̄)', f(st.xbar), '—', 'Centro do processo', mkBadge('Calculado', 'info')));
-  R.push(row('Mediana', f(st.n % 2 === 0 ? (st.mn + st.mx) / 2 : st.mx), '—', 'Valor central da amostra', mkBadge('Calculado', 'info')));
-  R.push(row('Desvio Padrão (s)', f(st.s), '—', 'Variabilidade global do processo', mkBadge('Calculado', 'info')));
-  R.push(row('Variância (s²)', f(st.s * st.s), '—', 'Quadrática da variabilidade', mkBadge('Calculado', 'info')));
-  R.push(row('Mínimo', f(st.mn), '—', 'Menor valor medido', mkBadge('Calculado', 'info')));
-  R.push(row('Máximo', f(st.mx), '—', 'Maior valor medido', mkBadge('Calculado', 'info')));
-  R.push(row('Amplitude (Max−Min)', f(st.rng), '—', 'Diferença entre máximo e mínimo', mkBadge('Calculado', 'info')));
-  R.push(row('Assimetria (Sk)', f(st.sk, 4), '≈ 0 (Normal)', 'Medida de simetria da distribuição', st.normOK ? mkBadge('OK', 'ok') : mkBadge('Verificar', 'warn')));
-  R.push(row('Curtose (Ku)', f(st.ku, 4), '≈ 0 (Normal)', 'Medida de achatamento da distribuição', st.normOK ? mkBadge('OK', 'ok') : mkBadge('Verificar', 'warn')));
+  R.push(sec(t('stats.sec.desc', '📊 Estatísticas Descritivas'), true));
+  R.push(row(t('stats.label.mean', 'Média (x̄)'), f(st.xbar), '—', t('stats.interp.center', 'Centro do processo'), mkBadge(t('stats.badge.calculated', 'Calculado'), 'info')));
+  R.push(row(t('stats.label.median', 'Mediana'), f(st.n % 2 === 0 ? (st.mn + st.mx) / 2 : st.mx), '—', t('stats.interp.median', 'Valor central da amostra'), mkBadge(t('stats.badge.calculated', 'Calculado'), 'info')));
+  R.push(row(t('stats.label.stdDev', 'Desvio Padrão (s)'), f(st.s), '—', t('stats.interp.variability', 'Variabilidade global do processo'), mkBadge(t('stats.badge.calculated', 'Calculado'), 'info')));
+  R.push(row(t('stats.label.variance', 'Variância (s²)'), f(st.s * st.s), '—', t('stats.interp.varianceSq', 'Quadrática da variabilidade'), mkBadge(t('stats.badge.calculated', 'Calculado'), 'info')));
+  R.push(row(t('stats.label.min', 'Mínimo'), f(st.mn), '—', t('stats.interp.minVal', 'Menor valor medido'), mkBadge(t('stats.badge.calculated', 'Calculado'), 'info')));
+  R.push(row(t('stats.label.max', 'Máximo'), f(st.mx), '—', t('stats.interp.maxVal', 'Maior valor medido'), mkBadge(t('stats.badge.calculated', 'Calculado'), 'info')));
+  R.push(row(t('stats.label.range', 'Amplitude (Max−Min)'), f(st.rng), '—', t('stats.interp.rangeDiff', 'Diferença entre máximo e mínimo'), mkBadge(t('stats.badge.calculated', 'Calculado'), 'info')));
+  R.push(row(t('stats.label.skew', 'Assimetria (Sk)'), f(st.sk, 4), t('stats.ref.normal', '≈ 0 (Normal)'), t('stats.interp.skewMeasure', 'Medida de simetria da distribuição'), st.normOK ? mkBadge(t('stats.badge.ok', 'OK'), 'ok') : mkBadge(t('stats.badge.check', 'Verificar'), 'warn')));
+  R.push(row(t('stats.label.kurt', 'Curtose (Ku)'), f(st.ku, 4), t('stats.ref.normal', '≈ 0 (Normal)'), t('stats.interp.kurtMeasure', 'Medida de achatamento da distribuição'), st.normOK ? mkBadge(t('stats.badge.ok', 'OK'), 'ok') : mkBadge(t('stats.badge.check', 'Verificar'), 'warn')));
 
-  R.push(sec('📈 Índices de Capabilidade — AIAG / ISO 22514', true));
-  R.push(row('Cp', st.Cp != null ? f(st.Cp) : 'N/A', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)', 'Capabilidade Potencial (Largura da tolerância / 6σ̂)', capBadge(st.Cp)));
-  R.push(row('Cpk', st.Cpk != null ? f(st.Cpk) : '—', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)', 'Capabilidade Real (centramento + variabilidade)', capBadge(st.Cpk)));
-  R.push(row('Pp', st.Pp != null ? f(st.Pp) : 'N/A', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)', 'Performance Potencial (Largura da tolerância / 6s)', capBadge(st.Pp)));
-  R.push(row('Ppk', st.Ppk != null ? f(st.Ppk) : '—', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)', 'Performance Real (centramento + variabilidade global)', capBadge(st.Ppk)));
-  R.push(row('CpU', st.CpU != null ? f(st.CpU) : 'N/A', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)', 'Capabilidade unilateral superior (USL)', capBadge(st.CpU)));
-  R.push(row('CpL', st.CpL != null ? f(st.CpL) : 'N/A', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)', 'Capabilidade unilateral inferior (LSL)', capBadge(st.CpL)));
+  R.push(sec(t('stats.sec.cap', '📈 Índices de Capabilidade — AIAG / ISO 22514'), true));
+  R.push(row('Cp', st.Cp != null ? f(st.Cp) : 'N/A', t('stats.ref.capIdx', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)'), t('stats.interp.capPotential', 'Capabilidade Potencial (Largura da tolerância / 6σ̂)'), capBadge(st.Cp)));
+  R.push(row('Cpk', st.Cpk != null ? f(st.Cpk) : '—', t('stats.ref.capIdx', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)'), t('stats.interp.capReal', 'Capabilidade Real (centramento + variabilidade)'), capBadge(st.Cpk)));
+  R.push(row('Pp', st.Pp != null ? f(st.Pp) : 'N/A', t('stats.ref.capIdx', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)'), t('stats.interp.perfPotential', 'Performance Potencial (Largura da tolerância / 6s)'), capBadge(st.Pp)));
+  R.push(row('Ppk', st.Ppk != null ? f(st.Ppk) : '—', t('stats.ref.capIdx', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)'), t('stats.interp.perfReal', 'Performance Real (centramento + variabilidade global)'), capBadge(st.Ppk)));
+  R.push(row('CpU', st.CpU != null ? f(st.CpU) : 'N/A', t('stats.ref.capIdx', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)'), t('stats.interp.capUpper', 'Capabilidade unilateral superior (USL)'), capBadge(st.CpU)));
+  R.push(row('CpL', st.CpL != null ? f(st.CpL) : 'N/A', t('stats.ref.capIdx', '≥ 1.67 (Excelente), ≥ 1.33 (Aceitável)'), t('stats.interp.capLower', 'Capabilidade unilateral inferior (LSL)'), capBadge(st.CpL)));
 
-  R.push(sec('🎛️ Gráfico de Controle I-MR — AIAG SPC Manual 2ª Ed.'));
-  R.push(row('d₂ (constante para n=2)', D2, 'Tabela AIAG', 'Constante para estimativa de σ̂ via amplitude móvel', mkBadge('AIAG', 'info')));
-  R.push(row('D₄ (constante para n=2)', D4, 'Tabela AIAG', 'Constante UCL para gráfico de amplitude móvel', mkBadge('AIAG', 'info')));
-  R.push(row('Amplitude Móvel Média (MR̄)', f(st.MRbar), '—', 'Média das amplitudes móveis entre observações consecutivas', mkBadge('Calculado', 'info')));
-  R.push(row('UCL — I-Chart', f(st.UCLi), '—', 'x̄ + 3σ̂ = x̄ + 3×(MR̄/d₂)', mkBadge('Calculado', 'info')));
-  R.push(row('LCL — I-Chart', f(st.LCLi), '—', 'x̄ − 3σ̂ = x̄ − 3×(MR̄/d₂)', mkBadge('Calculado', 'info')));
-  R.push(row('UCL — MR-Chart', f(st.UCLmr), '—', 'D₄ × MR̄ = ' + D4 + ' × ' + f(st.MRbar), mkBadge('Calculado', 'info')));
-  R.push(row('Pontos fora de controle', st.ooc, '= 0 (Regra 1 Shewhart)', 'Violações da regra 3σ no I-Chart', st.ooc === 0 ? mkBadge('Nenhuma', 'ok') : mkBadge(st.ooc + ' violações', 'fail')));
-  R.push(row('Estabilidade do Processo', st.stable ? 'Estável' : 'Instável', 'Sem pts fora UCL/LCL + sem corridas', 'Baseado em regra 3σ e run-rule de 8 pts consecutivos', st.stable ? mkBadge('Processo Estável', 'ok') : mkBadge('Processo Instável', 'fail')));
-  R.push(row('Peças fora de especificação', st.oos, '= 0', 'Contagem de observações fora de LSL/USL', st.oos === 0 ? mkBadge('Nenhuma', 'ok') : mkBadge(st.oos + ' peça(s)', 'fail')));
-  R.push(row('PPM Estimado (teórico)', st.ppm != null ? st.ppm.toFixed(2) : '—', '< 3.4 → 6σ', 'Estimativa baseada na distribuição normal. Para PPM real, usar dados históricos.', st.ppm != null ? (st.ppm < 233 ? mkBadge('Excelente', 'ok') : st.ppm < 6210 ? mkBadge('Aceitável', 'warn') : mkBadge('Alto', 'fail')) : mkBadge('—', 'dim')));
+  R.push(sec(t('stats.sec.ctrl', '🎛️ Gráfico de Controle I-MR — AIAG SPC Manual 2ª Ed.')));
+  R.push(row('d₂ (constante para n=2)', D2, t('stats.ref.aiag', 'Tabela AIAG'), t('stats.interp.d2const', 'Constante para estimativa de σ̂ via amplitude móvel'), mkBadge('AIAG', 'info')));
+  R.push(row('D₄ (constante para n=2)', D4, t('stats.ref.aiag', 'Tabela AIAG'), t('stats.interp.d4const', 'Constante UCL para gráfico de amplitude móvel'), mkBadge('AIAG', 'info')));
+  R.push(row(t('stats.label.mrbar', 'Amplitude Móvel Média (MR̄)'), f(st.MRbar), '—', t('stats.interp.mrbarMean', 'Média das amplitudes móveis entre observações consecutivas'), mkBadge(t('stats.badge.calculated', 'Calculado'), 'info')));
+  R.push(row('UCL — I-Chart', f(st.UCLi), '—', 'x̄ + 3σ̂ = x̄ + 3×(MR̄/d₂)', mkBadge(t('stats.badge.calculated', 'Calculado'), 'info')));
+  R.push(row('LCL — I-Chart', f(st.LCLi), '—', 'x̄ − 3σ̂ = x̄ − 3×(MR̄/d₂)', mkBadge(t('stats.badge.calculated', 'Calculado'), 'info')));
+  R.push(row('UCL — MR-Chart', f(st.UCLmr), '—', 'D₄ × MR̄ = ' + D4 + ' × ' + f(st.MRbar), mkBadge(t('stats.badge.calculated', 'Calculado'), 'info')));
+  R.push(row(t('stats.label.ooc', 'Pontos fora de controle'), st.ooc, t('stats.ref.ooc', '= 0 (Regra 1 Shewhart)'), t('stats.interp.oocViolations', 'Violações da regra 3σ no I-Chart'), st.ooc === 0 ? mkBadge(t('stats.badge.none', 'Nenhuma'), 'ok') : mkBadge(st.ooc + ' ' + t('stats.badge.violationsWord', 'violações'), 'fail')));
+  R.push(row(t('stats.label.stability', 'Estabilidade do Processo'), st.stable ? t('Estável', 'Estável') : t('Instável', 'Instável'), t('stats.ref.stability', 'Sem pts fora UCL/LCL + sem corridas'), t('stats.interp.stabilityBasis', 'Baseado em regra 3σ e run-rule de 8 pts consecutivos'), st.stable ? mkBadge(t('stats.badge.processStable', 'Processo Estável'), 'ok') : mkBadge(t('stats.badge.processUnstable', 'Processo Instável'), 'fail')));
+  R.push(row(t('stats.label.oos', 'Peças fora de especificação'), st.oos, t('stats.ref.oosZero', '= 0'), t('stats.interp.oosCount', 'Contagem de observações fora de LSL/USL'), st.oos === 0 ? mkBadge(t('stats.badge.none', 'Nenhuma'), 'ok') : mkBadge(st.oos + ' ' + t('stats.badge.pieceWord', 'peça(s)'), 'fail')));
+  R.push(row(t('stats.label.ppm', 'PPM Estimado (teórico)'), st.ppm != null ? st.ppm.toFixed(2) : '—', t('stats.ref.ppm', '< 3.4 → 6σ'), t('stats.interp.ppmEstimate', 'Estimativa baseada na distribuição normal. Para PPM real, usar dados históricos.'), st.ppm != null ? (st.ppm < 233 ? mkBadge(t('stats.badge.excellent', 'Excelente'), 'ok') : st.ppm < 6210 ? mkBadge(t('stats.badge.acceptable', 'Aceitável'), 'warn') : mkBadge(t('stats.badge.high', 'Alto'), 'fail')) : mkBadge('—', 'dim')));
 
   document.getElementById('statsTBody').innerHTML = R.join('');
-  document.getElementById('tableTs').textContent = 'Atualizado: ' + new Date().toLocaleDateString('pt-BR');
+  document.getElementById('tableTs').textContent = t('stats.updated', 'Atualizado') + ': ' + new Date().toLocaleDateString('pt-BR');
 }
 
 function updateChips() {
@@ -6450,7 +6458,12 @@ renderDashboard();
     document.documentElement.setAttribute('lang', currentLang);
   }
 
-  window.t = t;
+  // NÃO sobrescrever window.t aqui — window.t já é definido corretamente
+  // no bloco principal de i18n (sincronizado com o idioma real da planta,
+  // usado por applyI18nToDOM/_translateTextNodes). Esta versão local usa
+  // 'currentLang', que nunca é atualizado para o idioma real da planta,
+  // e sobrescrevê-la fazia TODOS os elementos [data-i18n] (nav, admin
+  // etc.) sempre caírem em português, não importa o idioma selecionado.
   window._adminT = t;
   window._adminApplyI18n = applyI18n;
   window._I18N_LOCAL = I18N;
@@ -7387,6 +7400,25 @@ renderDashboard();
       'Capabilidade unilateral inferior (LSL)': 'Lower one-sided capability (LSL)',
       'Tabela AIAG': 'AIAG table', 'AIAG': 'AIAG',
       'Sem nome': 'Unnamed', 'Capaz': 'Capable', 'Monitor': 'Monitor',
+      'Indicador Cpk / Gauge': 'Cpk Indicator / Gauge',
+      'Histograma + Curva Normal': 'Histogram + Normal Curve',
+      'Gráfico I — Valores Individuais': 'Individuals Chart — Individual Values',
+      'Gráfico I (Valores Individuais)': 'Individuals Chart (Individual Values)',
+      'Gráfico MR — Amplitude Móvel': 'MR Chart — Moving Range',
+      'Gráfico MR (Amplitude Móvel)': 'MR Chart (Moving Range)',
+      'Boxplot — Dispersão e Outliers': 'Boxplot — Dispersion and Outliers',
+      'Gráfico de Probabilidade Normal (Q-Q)': 'Normal Probability Plot (Q-Q)',
+      'Tendência de Cpk — Evolução por Janela': 'Cpk Trend — Evolution by Window',
+      'UCL / LCL': 'UCL / LCL', 'Q1–Q3': 'Q1–Q3', 'Mediana': 'Median',
+      'Pontos observados': 'Observed points', 'Linha normal teórica': 'Theoretical normal line',
+      'Cpk janela': 'Cpk window', 'Cpk (janela)': 'Cpk (window)', 'Cp (janela)': 'Cp (window)',
+      'Limite 1.33': 'Limit 1.33', 'Limite 1.67': 'Limit 1.67',
+      'Cpk dos últimos 15 estudos': 'Cpk of the last 15 studies',
+      'Distribuição por Status': 'Distribution by Status',
+      'Tendência Cpk ao Longo do Tempo': 'Cpk Trend Over Time',
+      'Nº Observação': 'Observation #', 'Observação': 'Observation',
+      'Amplitude Móvel': 'Moving Range',
+      'Estável': 'Stable', 'Instável': 'Unstable', 'Sem Violações': 'No Violations',
       'Salvo': 'Saved'
     },
     'es-MX': {
@@ -7482,6 +7514,25 @@ renderDashboard();
       'Capabilidade unilateral inferior (LSL)': 'Capacidad unilateral inferior (LEC)',
       'Tabela AIAG': 'Tabla AIAG', 'AIAG': 'AIAG',
       'Sem nome': 'Sin nombre', 'Capaz': 'Capaz', 'Monitor': 'Monitorear',
+      'Indicador Cpk / Gauge': 'Indicador Cpk / Medidor',
+      'Histograma + Curva Normal': 'Histograma + Curva Normal',
+      'Gráfico I — Valores Individuais': 'Gráfico I — Valores Individuales',
+      'Gráfico I (Valores Individuais)': 'Gráfico I (Valores Individuales)',
+      'Gráfico MR — Amplitude Móvel': 'Gráfico MR — Rango Móvil',
+      'Gráfico MR (Amplitude Móvel)': 'Gráfico MR (Rango Móvil)',
+      'Boxplot — Dispersão e Outliers': 'Boxplot — Dispersión y Valores Atípicos',
+      'Gráfico de Probabilidade Normal (Q-Q)': 'Gráfico de Probabilidad Normal (Q-Q)',
+      'Tendência de Cpk — Evolução por Janela': 'Tendencia de Cpk — Evolución por Ventana',
+      'UCL / LCL': 'UCL / LCL', 'Q1–Q3': 'Q1–Q3', 'Mediana': 'Mediana',
+      'Pontos observados': 'Puntos observados', 'Linha normal teórica': 'Línea normal teórica',
+      'Cpk janela': 'Cpk ventana', 'Cpk (janela)': 'Cpk (ventana)', 'Cp (janela)': 'Cp (ventana)',
+      'Limite 1.33': 'Límite 1.33', 'Limite 1.67': 'Límite 1.67',
+      'Cpk dos últimos 15 estudos': 'Cpk de los últimos 15 estudios',
+      'Distribuição por Status': 'Distribución por Estado',
+      'Tendência Cpk ao Longo do Tempo': 'Tendencia de Cpk a lo Largo del Tiempo',
+      'Nº Observação': 'N.º Observación', 'Observação': 'Observación',
+      'Amplitude Móvel': 'Rango Móvil',
+      'Estável': 'Estable', 'Instável': 'Inestable', 'Sem Violações': 'Sin Violaciones',
       'Salvo': 'Guardado'
     },
     'de-DE': {
