@@ -52,6 +52,20 @@ const CM_SPARKS = {};
 const DASH_CH = { bar: null, donut: null, studiesByPN: null };
 const DASH_CH4 = { trend: null, scatter: null, top: null, polar: null };
 const CM_MODAL_CH = { trend: null, hist: null, ic: null };
+
+// Cria um Chart.js de forma segura: destroi QUALQUER instância já
+// vinculada ao canvas (mesmo que nossa variável de rastreamento local
+// esteja desatualizada/perdida), evitando o erro "Canvas is already
+// in use. Chart with ID '...' must be destroyed before the canvas...".
+// Aceita tanto um contexto 2D (ctx) quanto o próprio elemento <canvas>.
+function _mkChart(ctxOrCanvas, config) {
+  var canvas = (ctxOrCanvas && ctxOrCanvas.canvas) ? ctxOrCanvas.canvas : ctxOrCanvas;
+  try {
+    var existing = (typeof Chart !== 'undefined' && Chart.getChart) ? Chart.getChart(canvas) : null;
+    if (existing) existing.destroy();
+  } catch (e) { /* noop */ }
+  return new Chart(ctxOrCanvas, config);
+}
 let _cmOpenStudyId = null;
 
 // ============================================================
@@ -3273,7 +3287,7 @@ function renderDashboardExtras(all) {
   var trendData = sorted.map(function(s) { return s.stats.Cpk; });
   if (DASH_CH4.trend) DASH_CH4.trend.destroy();
   var tCtx = document.getElementById('dashTrend').getContext('2d');
-  DASH_CH4.trend = new Chart(tCtx, {
+  DASH_CH4.trend = _mkChart(tCtx, {
     type: 'line',
     data: {
       labels: trendLabels,
@@ -3311,7 +3325,7 @@ function renderDashboardExtras(all) {
   });
   if (DASH_CH4.scatter) DASH_CH4.scatter.destroy();
   var sCtx = document.getElementById('dashScatter').getContext('2d');
-  DASH_CH4.scatter = new Chart(sCtx, {
+  DASH_CH4.scatter = _mkChart(sCtx, {
     type: 'scatter',
     data: {
       datasets: [{
@@ -3341,7 +3355,7 @@ function renderDashboardExtras(all) {
   var topColors = top10.map(function(s) { return studyClass(s.stats.Cpk).color; });
   if (DASH_CH4.top) DASH_CH4.top.destroy();
   var tpCtx = document.getElementById('dashTop').getContext('2d');
-  DASH_CH4.top = new Chart(tpCtx, {
+  DASH_CH4.top = _mkChart(tpCtx, {
     type: 'bar',
     data: {
       labels: topLabels,
@@ -3373,7 +3387,7 @@ function renderDashboardExtras(all) {
   valid.forEach(function(s) { buckets[studyClass(s.stats.Cpk).k]++; });
   if (DASH_CH4.polar) DASH_CH4.polar.destroy();
   var pCtx = document.getElementById('dashPolar').getContext('2d');
-  DASH_CH4.polar = new Chart(pCtx, {
+  DASH_CH4.polar = _mkChart(pCtx, {
     type: 'polarArea',
     data: {
       labels: ['Classe Mundial', 'Excelente', 'Aceitável', 'Reprovado'],
@@ -3553,7 +3567,7 @@ function renderCMDash() {
       var colorMap = { 'ok': '#059669', 'warn': '#d97706', 'fail': '#dc2626', 'gold': '#b7860e' };
       var col = colorMap[cls.k] || '#1a56db';
       if (CM_SPARKS[s.id]) { try { CM_SPARKS[s.id].destroy(); } catch (e) {} }
-      CM_SPARKS[s.id] = new Chart(canvas.getContext('2d'), {
+      CM_SPARKS[s.id] = _mkChart(canvas.getContext('2d'), {
         type: 'line',
         data: {
           labels: sparkData.map(function(_, i) { return i; }),
@@ -3642,7 +3656,7 @@ function _cmRenderModalCharts(study) {
     if (CM_MODAL_CH.trend) { try { CM_MODAL_CH.trend.destroy(); } catch (e) {} }
     var cls = cmStudyClass(st.Cpk);
     var col = { 'ok': '#059669', 'warn': '#d97706', 'fail': '#dc2626', 'gold': '#b7860e' }[cls.k] || '#1a56db';
-    CM_MODAL_CH.trend = new Chart(document.getElementById('cmCpkTrend').getContext('2d'), {
+    CM_MODAL_CH.trend = _mkChart(document.getElementById('cmCpkTrend').getContext('2d'), {
       type: 'line',
       data: {
         labels: sparkData.map(function(_, i) { return i + 1; }),
@@ -3684,7 +3698,7 @@ function _cmRenderModalCharts(study) {
   var labels = bins.map(function(_, i) { return (mn + i * bw + bw / 2).toFixed(2); });
   var cls2 = cmStudyClass(st.Cpk);
   var col2 = { 'ok': 'rgba(5,150,105,0.7)', 'warn': 'rgba(217,119,6,0.7)', 'fail': 'rgba(220,38,38,0.7)', 'gold': 'rgba(183,134,14,0.7)' }[cls2.k] || 'rgba(26,86,219,0.7)';
-  CM_MODAL_CH.hist = new Chart(document.getElementById('cmHist').getContext('2d'), {
+  CM_MODAL_CH.hist = _mkChart(document.getElementById('cmHist').getContext('2d'), {
     type: 'bar',
     data: { labels: labels, datasets: [{ data: bins, backgroundColor: col2, borderRadius: 3 }] },
     options: {
@@ -3705,7 +3719,7 @@ function _cmRenderModalCharts(study) {
   var UCLi = xb + 3 * sw2,
     LCLi = xb - 3 * sw2;
   var ptColors = arr.map(function(v) { return (v > UCLi || v < LCLi) ? '#dc2626' : '#1a56db'; });
-  CM_MODAL_CH.ic = new Chart(document.getElementById('cmIC').getContext('2d'), {
+  CM_MODAL_CH.ic = _mkChart(document.getElementById('cmIC').getContext('2d'), {
     type: 'line',
     data: {
       labels: arr.map(function(_, i) { return i + 1; }),
@@ -3772,7 +3786,7 @@ function renderDashboard() {
   var colors = last15.map(function(s) { return studyClass(s.stats && s.stats.Cpk).color; });
   if (DASH_CH.bar) DASH_CH.bar.destroy();
   var barCtx = document.getElementById('dashBar').getContext('2d');
-  DASH_CH.bar = new Chart(barCtx, {
+  DASH_CH.bar = _mkChart(barCtx, {
     type: 'bar',
     data: {
       labels: labels,
@@ -3799,7 +3813,7 @@ function renderDashboard() {
   cpks.forEach(function(v) { buckets2[studyClass(v).k]++; });
   if (DASH_CH.donut) DASH_CH.donut.destroy();
   var dCtx = document.getElementById('dashDonut').getContext('2d');
-  DASH_CH.donut = new Chart(dCtx, {
+  DASH_CH.donut = _mkChart(dCtx, {
     type: 'doughnut',
     data: {
       labels: ['Classe Mundial (≥1.67)', 'Excelente (≥1.33)', 'Aceitável (≥1.00)', 'Reprovado (<1.00)'],
@@ -3822,7 +3836,7 @@ function renderDashboard() {
   var pnCanvas = document.getElementById('dashStudiesByPN');
   if (pnCanvas) {
     var pnCtx = pnCanvas.getContext('2d');
-    DASH_CH.studiesByPN = new Chart(pnCtx, {
+    DASH_CH.studiesByPN = _mkChart(pnCtx, {
       type: 'bar',
       data: {
         labels: pnLabels,
@@ -4236,7 +4250,7 @@ function renderHistogram(st, arr) {
   };
 
   if (CH.hist) CH.hist.destroy();
-  CH.hist = new Chart(ctx, {
+  CH.hist = _mkChart(ctx, {
     type: 'scatter',
     data: { datasets: [] },
     options: {
@@ -4294,7 +4308,7 @@ function renderIChart(st, arr) {
   if (S.lsl != null) sets.push({ label: 'LSL=' + f(S.lsl), data: arr.map(function() { return S.lsl; }), borderColor: 'rgba(220,38,38,0.5)', borderWidth: 1.2, borderDash: [2, 3], pointRadius: 0, fill: false, order: 1 });
   if (S.target != null) sets.push({ label: 'TGT=' + f(S.target), data: arr.map(function() { return S.target; }), borderColor: 'rgba(26,86,219,0.4)', borderWidth: 1, borderDash: [3, 3], pointRadius: 0, fill: false, order: 1 });
 
-  CH.ic = new Chart(ctx, {
+  CH.ic = _mkChart(ctx, {
     type: 'line',
     data: { labels: labels, datasets: sets },
     options: {
@@ -4324,7 +4338,7 @@ function renderMRChart(st) {
   var labels = MRs.map(function(_, i) { return i + 2; });
   var ptColors = MRs.map(function(v) { return v > st.UCLmr ? 'rgba(220,38,38,0.7)' : 'rgba(5,150,105,0.55)'; });
 
-  CH.mr = new Chart(ctx, {
+  CH.mr = _mkChart(ctx, {
     type: 'bar',
     data: {
       labels: labels,
@@ -4451,7 +4465,7 @@ function renderBoxplot(st, arr) {
   };
 
   var outData = outliers.map(function(v) { return { x: v, y: 0 }; });
-  CH.box = new Chart(ctx, {
+  CH.box = _mkChart(ctx, {
     type: 'scatter',
     data: { datasets: [{ label: 'Outliers', data: outData, backgroundColor: '#dc2626', pointRadius: 5, pointStyle: 'circle' }] },
     options: {
@@ -4500,7 +4514,7 @@ function renderQQPlot(st, arr) {
     { x: zMax, y: st.xbar + st.s * zMax }
   ];
 
-  CH.qq = new Chart(ctx, {
+  CH.qq = _mkChart(ctx, {
     type: 'scatter',
     data: {
       datasets: [
@@ -4563,7 +4577,7 @@ function renderCpkTrend(st, arr) {
   var ref133 = labels.map(function() { return 1.33; });
   var ref167 = labels.map(function() { return 1.67; });
 
-  CH.cpktrend = new Chart(ctx, {
+  CH.cpktrend = _mkChart(ctx, {
     type: 'line',
     data: {
       labels: labels,
@@ -7089,7 +7103,6 @@ renderDashboard();
 
       var navDash = document.querySelector('.nav-tab[onclick*="dashboard"]');
       if (typeof showPage === 'function') showPage('dashboard', navDash);
-      if (typeof renderDashboard === 'function') try { renderDashboard(); } catch (e) {}
 
       setTimeout(function() {
         if (typeof window.applyI18nToDOM === 'function') try { window.applyI18nToDOM(); } catch (e) {}
