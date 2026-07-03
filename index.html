@@ -81,10 +81,17 @@ function initSupabaseClient() {
 
     console.log('[SB] ✓ Inicializando cliente Supabase...');
 
+    // Force login every time: clear any previously stored session
+    try {
+      Object.keys(window.localStorage || {}).forEach(function(k) {
+        if (/^sb-/.test(k) || k.indexOf('supabase') !== -1) window.localStorage.removeItem(k);
+      });
+    } catch(e) {}
+
     var supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
-        autoRefreshToken: true,
-        persistSession: true,
+        autoRefreshToken: false,
+        persistSession: false,
         detectSessionInUrl: true
       },
       realtime: {
@@ -9462,6 +9469,409 @@ window.clearBrandingLogo = function() {
   /* ── Also re-run 1s and 2s after page load (handles late renders) ── */
   setTimeout(function(){ _reMergeCurrent(); _translateAttributes(); _reWalkStatic(); }, 1000);
   setTimeout(function(){ _reMergeCurrent(); _translateAttributes(); _reWalkStatic(); }, 2000);
+
+})();
+</script>
+
+<!-- ===== i18n PATCH v3 — form labels, placeholders, sim dynamic text ===== -->
+<script>
+(function(){
+  'use strict';
+
+  var _EXTRA3 = {
+
+    'en-US': {
+      /* form labels */
+      'Característica (Código)':'Characteristic (Code)',
+      'Nome da Característica':'Characteristic Name',
+      'LSL (Inferior)':'LSL (Lower)',
+      'USL (Superior)':'USL (Upper)',
+      'Especificado por':'Specified by',
+      'Unidade':'Unit',
+      'Tipo':'Type',
+      'Bilateral (LSL+USL)':'Bilateral (LSL+USL)',
+      'Unilateral Superior':'Upper Unilateral',
+      'Unilateral Inferior':'Lower Unilateral',
+      'Responsável':'Responsible',
+      'Data do Estudo':'Study Date',
+      'Equipamento':'Equipment',
+      'Nº Relatório':'Report No.',
+      'Observações':'Observations',
+      /* tabs */
+      'Colar':'Paste',
+      /* simulator labels */
+      'Nominal / Referência':'Nominal / Reference',
+      'Tipo de tolerância':'Tolerance type',
+      'Variação (±)':'Variation (±)',
+      'Superior (+)':'Upper (+)',
+      'Inferior (-)':'Lower (-)',
+      'Amplitude total (IT)':'Total amplitude (IT)',
+      'Coluna (nº ou nome)':'Column (no. or name)',
+      'Separador':'Separator',
+      /* tolerance info labels */
+      'Tolerância:':'Tolerance:',
+      /* placeholders */
+      'Ex: Eixo Principal':'Ex: Main Shaft',
+      'Ex: Diâmetro Externo':'Ex: Outer Diameter',
+      'Norma / Desenho':'Standard / Drawing',
+      'Nome completo':'Full name',
+      'Condições de medição, lote, observações\u2026':'Measurement conditions, batch, observations\u2026',
+      'Ex: CMM / Paquímetro':'Ex: CMM / Caliper',
+      'Inserir valor\u2026':'Enter value\u2026',
+      /* sim feedback fragments (used by _patchSimFragments) */
+      ' amostras geradas':' samples generated',
+      ' \u2192 FIXO':' \u2192 FIXED',
+      'Faixa real: ':'Actual range: ',
+      '(centro = ':'(center = ',
+      'Cpk alvo \u2265 ':'Target Cpk \u2265 ',
+      ' \u2014 garantido':' \u2014 guaranteed'
+    },
+
+    'es-MX': {
+      'Característica (Código)':'Característica (Código)',
+      'Nome da Característica':'Nombre de la Característica',
+      'LSL (Inferior)':'LSL (Inferior)',
+      'USL (Superior)':'USL (Superior)',
+      'Especificado por':'Especificado por',
+      'Unidade':'Unidad',
+      'Tipo':'Tipo',
+      'Bilateral (LSL+USL)':'Bilateral (LSL+USL)',
+      'Unilateral Superior':'Unilateral Superior',
+      'Unilateral Inferior':'Unilateral Inferior',
+      'Responsável':'Responsable',
+      'Data do Estudo':'Fecha del Estudio',
+      'Equipamento':'Equipo',
+      'Nº Relatório':'Nº Informe',
+      'Observações':'Observaciones',
+      'Colar':'Pegar',
+      'Nominal / Referência':'Nominal / Referencia',
+      'Tipo de tolerância':'Tipo de tolerancia',
+      'Variação (±)':'Variación (±)',
+      'Superior (+)':'Superior (+)',
+      'Inferior (-)':'Inferior (-)',
+      'Amplitude total (IT)':'Amplitud total (IT)',
+      'Coluna (nº ou nome)':'Columna (nº o nombre)',
+      'Separador':'Separador',
+      'Tolerância:':'Tolerancia:',
+      'Ex: Eixo Principal':'Ex: Eje Principal',
+      'Ex: Diâmetro Externo':'Ex: Diámetro Externo',
+      'Norma / Desenho':'Norma / Dibujo',
+      'Nome completo':'Nombre completo',
+      'Condições de medição, lote, observações\u2026':'Condiciones de medición, lote, observaciones\u2026',
+      'Ex: CMM / Paquímetro':'Ex: MMC / Calibrador',
+      'Inserir valor\u2026':'Ingresar valor\u2026',
+      ' amostras geradas':' muestras generadas',
+      ' \u2192 FIXO':' \u2192 FIJO',
+      'Faixa real: ':'Rango real: ',
+      '(centro = ':'(centro = ',
+      'Cpk alvo \u2265 ':'Cpk objetivo \u2265 ',
+      ' \u2014 garantido':' \u2014 garantizado'
+    },
+
+    'es-ES': {
+      'Característica (Código)':'Característica (Código)',
+      'Nome da Característica':'Nombre de la Característica',
+      'LSL (Inferior)':'LSL (Inferior)',
+      'USL (Superior)':'USL (Superior)',
+      'Especificado por':'Especificado por',
+      'Unidade':'Unidad',
+      'Tipo':'Tipo',
+      'Bilateral (LSL+USL)':'Bilateral (LSL+USL)',
+      'Unilateral Superior':'Unilateral Superior',
+      'Unilateral Inferior':'Unilateral Inferior',
+      'Responsável':'Responsable',
+      'Data do Estudo':'Fecha del Estudio',
+      'Equipamento':'Equipo',
+      'Nº Relatório':'Nº Informe',
+      'Observações':'Observaciones',
+      'Colar':'Pegar',
+      'Nominal / Referência':'Nominal / Referencia',
+      'Tipo de tolerância':'Tipo de tolerancia',
+      'Variação (±)':'Variación (±)',
+      'Superior (+)':'Superior (+)',
+      'Inferior (-)':'Inferior (-)',
+      'Amplitude total (IT)':'Amplitud total (IT)',
+      'Coluna (nº ou nome)':'Columna (nº o nombre)',
+      'Separador':'Separador',
+      'Tolerância:':'Tolerancia:',
+      'Ex: Eixo Principal':'Ex: Eje Principal',
+      'Ex: Diâmetro Externo':'Ex: Diámetro Externo',
+      'Norma / Desenho':'Norma / Dibujo',
+      'Nome completo':'Nombre completo',
+      'Condições de medição, lote, observações\u2026':'Condiciones de medición, lote, observaciones\u2026',
+      'Ex: CMM / Paquímetro':'Ex: MMC / Calibrador',
+      'Inserir valor\u2026':'Ingresar valor\u2026',
+      ' amostras geradas':' muestras generadas',
+      ' \u2192 FIXO':' \u2192 FIJO',
+      'Faixa real: ':'Rango real: ',
+      '(centro = ':'(centro = ',
+      'Cpk alvo \u2265 ':'Cpk objetivo \u2265 ',
+      ' \u2014 garantido':' \u2014 garantizado'
+    },
+
+    'fr-FR': {
+      'Característica (Código)':'Caractéristique (Code)',
+      'Nome da Característica':'Nom de la caractéristique',
+      'LSL (Inferior)':'LSL (Inférieur)',
+      'USL (Superior)':'LSS (Supérieur)',
+      'Especificado por':'Spécifié par',
+      'Unidade':'Unité',
+      'Tipo':'Type',
+      'Bilateral (LSL+USL)':'Bilatéral (LSL+USL)',
+      'Unilateral Superior':'Unilatéral Supérieur',
+      'Unilateral Inferior':'Unilatéral Inférieur',
+      'Responsável':'Responsable',
+      'Data do Estudo':"Date de l'étude",
+      'Equipamento':'Équipement',
+      'Nº Relatório':'Nº Rapport',
+      'Observações':'Observations',
+      'Colar':'Coller',
+      'Nominal / Referência':'Nominal / Référence',
+      'Tipo de tolerância':'Type de tolérance',
+      'Variação (±)':'Variation (±)',
+      'Superior (+)':'Supérieur (+)',
+      'Inferior (-)':'Inférieur (-)',
+      'Amplitude total (IT)':'Amplitude totale (IT)',
+      'Coluna (nº ou nome)':'Colonne (nº ou nom)',
+      'Separador':'Séparateur',
+      'Tolerância:':'Tolérance:',
+      'Ex: Eixo Principal':'Ex: Axe Principal',
+      'Ex: Diâmetro Externo':'Ex: Diamètre Extérieur',
+      'Norma / Desenho':'Norme / Dessin',
+      'Nome completo':'Nom complet',
+      'Condições de medição, lote, observações\u2026':'Conditions de mesure, lot, observations\u2026',
+      'Ex: CMM / Paquímetro':'Ex: MMT / Pied à coulisse',
+      'Inserir valor\u2026':'Entrer une valeur\u2026',
+      ' amostras geradas':' échantillons générés',
+      ' \u2192 FIXO':' \u2192 FIXE',
+      'Faixa real: ':'Plage réelle: ',
+      '(centro = ':'(centre = ',
+      'Cpk alvo \u2265 ':'Cpk cible \u2265 ',
+      ' \u2014 garantido':' \u2014 garanti'
+    },
+
+    'it-IT': {
+      'Característica (Código)':'Caratteristica (Codice)',
+      'Nome da Característica':'Nome della caratteristica',
+      'LSL (Inferior)':'LSL (Inferiore)',
+      'USL (Superior)':'USL (Superiore)',
+      'Especificado por':'Specificato da',
+      'Unidade':'Unità',
+      'Tipo':'Tipo',
+      'Bilateral (LSL+USL)':'Bilaterale (LSL+USL)',
+      'Unilateral Superior':'Unilaterale Superiore',
+      'Unilateral Inferior':'Unilaterale Inferiore',
+      'Responsável':'Responsabile',
+      'Data do Estudo':'Data dello studio',
+      'Equipamento':'Attrezzatura',
+      'Nº Relatório':'Nº Rapporto',
+      'Observações':'Osservazioni',
+      'Colar':'Incolla',
+      'Nominal / Referência':'Nominale / Riferimento',
+      'Tipo de tolerância':'Tipo di tolleranza',
+      'Variação (±)':'Variazione (±)',
+      'Superior (+)':'Superiore (+)',
+      'Inferior (-)':'Inferiore (-)',
+      'Amplitude total (IT)':'Ampiezza totale (IT)',
+      'Coluna (nº ou nome)':'Colonna (nº o nome)',
+      'Separador':'Separatore',
+      'Tolerância:':'Tolleranza:',
+      'Ex: Eixo Principal':'Es: Albero Principale',
+      'Ex: Diâmetro Externo':'Es: Diametro Esterno',
+      'Norma / Desenho':'Norma / Disegno',
+      'Nome completo':'Nome completo',
+      'Condições de medição, lote, observações\u2026':'Condizioni di misura, lotto, osservazioni\u2026',
+      'Ex: CMM / Paquímetro':'Es: CMM / Calibro',
+      'Inserir valor\u2026':'Inserire valore\u2026',
+      ' amostras geradas':' campioni generati',
+      ' \u2192 FIXO':' \u2192 FISSO',
+      'Faixa real: ':'Intervallo reale: ',
+      '(centro = ':'(centro = ',
+      'Cpk alvo \u2265 ':'Cpk obiettivo \u2265 ',
+      ' \u2014 garantido':' \u2014 garantito'
+    },
+
+    'en-GB': {
+      'Característica (Código)':'Characteristic (Code)',
+      'Nome da Característica':'Characteristic Name',
+      'LSL (Inferior)':'LSL (Lower)',
+      'USL (Superior)':'USL (Upper)',
+      'Especificado por':'Specified by',
+      'Unidade':'Unit',
+      'Tipo':'Type',
+      'Bilateral (LSL+USL)':'Bilateral (LSL+USL)',
+      'Unilateral Superior':'Upper Unilateral',
+      'Unilateral Inferior':'Lower Unilateral',
+      'Responsável':'Responsible',
+      'Data do Estudo':'Study Date',
+      'Equipamento':'Equipment',
+      'Nº Relatório':'Report No.',
+      'Observações':'Observations',
+      'Colar':'Paste',
+      'Nominal / Referência':'Nominal / Reference',
+      'Tipo de tolerância':'Tolerance type',
+      'Variação (±)':'Variation (±)',
+      'Superior (+)':'Upper (+)',
+      'Inferior (-)':'Lower (-)',
+      'Amplitude total (IT)':'Total amplitude (IT)',
+      'Coluna (nº ou nome)':'Column (no. or name)',
+      'Separador':'Separator',
+      'Tolerância:':'Tolerance:',
+      'Ex: Eixo Principal':'Ex: Main Shaft',
+      'Ex: Diâmetro Externo':'Ex: Outer Diameter',
+      'Norma / Desenho':'Standard / Drawing',
+      'Nome completo':'Full name',
+      'Condições de medição, lote, observações\u2026':'Measurement conditions, batch, observations\u2026',
+      'Ex: CMM / Paquímetro':'Ex: CMM / Caliper',
+      'Inserir valor\u2026':'Enter value\u2026',
+      ' amostras geradas':' samples generated',
+      ' \u2192 FIXO':' \u2192 FIXED',
+      'Faixa real: ':'Actual range: ',
+      '(centro = ':'(center = ',
+      'Cpk alvo \u2265 ':'Target Cpk \u2265 ',
+      ' \u2014 garantido':' \u2014 guaranteed'
+    },
+
+    'de-DE': {
+      'Característica (Código)':'Merkmal (Code)',
+      'Nome da Característica':'Merkmalname',
+      'LSL (Inferior)':'UG (Untere Grenze)',
+      'USL (Superior)':'OG (Obere Grenze)',
+      'Especificado por':'Spezifiziert von',
+      'Unidade':'Einheit',
+      'Tipo':'Typ',
+      'Bilateral (LSL+USL)':'Bilateral (UG+OG)',
+      'Unilateral Superior':'Einseitig oben',
+      'Unilateral Inferior':'Einseitig unten',
+      'Responsável':'Verantwortlicher',
+      'Data do Estudo':'Studiendatum',
+      'Equipamento':'Gerät',
+      'Nº Relatório':'Bericht-Nr.',
+      'Observações':'Beobachtungen',
+      'Colar':'Einfügen',
+      'Nominal / Referência':'Nominal / Referenz',
+      'Tipo de tolerância':'Toleranztyp',
+      'Variação (±)':'Abweichung (±)',
+      'Superior (+)':'Oben (+)',
+      'Inferior (-)':'Unten (-)',
+      'Amplitude total (IT)':'Gesamttoleranz (IT)',
+      'Coluna (nº ou nome)':'Spalte (Nr. oder Name)',
+      'Separador':'Trennzeichen',
+      'Tolerância:':'Toleranz:',
+      'Ex: Eixo Principal':'z.B.: Hauptwelle',
+      'Ex: Diâmetro Externo':'z.B.: Außendurchmesser',
+      'Norma / Desenho':'Norm / Zeichnung',
+      'Nome completo':'Vollständiger Name',
+      'Condições de medição, lote, observações\u2026':'Messbedingungen, Charge, Beobachtungen\u2026',
+      'Ex: CMM / Paquímetro':'z.B.: KMG / Messschieber',
+      'Inserir valor\u2026':'Wert eingeben\u2026',
+      ' amostras geradas':' Messwerte generiert',
+      ' \u2192 FIXO':' \u2192 FEST',
+      'Faixa real: ':'Tats. Bereich: ',
+      '(centro = ':'(Zentrum = ',
+      'Cpk alvo \u2265 ':'Cpk-Ziel \u2265 ',
+      ' \u2014 garantido':' \u2014 garantiert'
+    }
+
+  };
+
+  /* ── Merge _EXTRA3 into _DYNTRAD ── */
+  if (window._DYNTRAD) {
+    Object.keys(_EXTRA3).forEach(function(lang) {
+      if (!window._DYNTRAD[lang]) {
+        window._DYNTRAD[lang] = _EXTRA3[lang];
+      } else {
+        var tgt = window._DYNTRAD[lang], src = _EXTRA3[lang];
+        Object.keys(src).forEach(function(k) {
+          if (!Object.prototype.hasOwnProperty.call(tgt, k)) tgt[k] = src[k];
+        });
+      }
+    });
+  }
+
+  /* ── Re-merge into i18nFlatDict ── */
+  function _reMerge3() {
+    var lang = (window.__currentLang || document.documentElement.lang || 'pt-BR').replace('_','-');
+    if (!lang || lang === 'pt-BR') return;
+    var src = window._DYNTRAD && window._DYNTRAD[lang];
+    if (!src) return;
+    if (!window.i18nFlatDict) window.i18nFlatDict = {};
+    Object.keys(src).forEach(function(k) { window.i18nFlatDict[k] = src[k]; });
+  }
+
+  /* ── Patch sim feedback/preview innerHTML (fragment replacement) ── */
+  function _patchSimFragments() {
+    var lang = (window.__currentLang || document.documentElement.lang || 'pt-BR').replace('_','-');
+    if (!lang || lang === 'pt-BR') return;
+    var d = window._DYNTRAD && window._DYNTRAD[lang];
+    if (!d) return;
+    var frags = [
+      [' amostras geradas', ' amostras geradas'],
+      [' \u2192 FIXO', ' \u2192 FIXO'],
+      ['Faixa real: ', 'Faixa real: '],
+      ['(centro = ', '(centro = '],
+      ['Cpk alvo \u2265 ', 'Cpk alvo \u2265 '],
+      [' \u2014 garantido', ' \u2014 garantido']
+    ];
+    ['simFeedback','simCalcPreview'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (!el || !el.innerHTML) return;
+      var h = el.innerHTML;
+      frags.forEach(function(pair) {
+        var trans = d[pair[0]];
+        if (trans && trans !== pair[0]) h = h.split(pair[0]).join(trans);
+      });
+      if (h !== el.innerHTML) el.innerHTML = h;
+    });
+  }
+
+  /* ── Wrap runSim to patch feedback after execution ── */
+  if (typeof window.runSim === 'function') {
+    var _origRunSim3 = window.runSim;
+    window.runSim = function() {
+      var r = _origRunSim3.apply(this, arguments);
+      setTimeout(_patchSimFragments, 80);
+      return r;
+    };
+  }
+
+  /* ── Wrap simPreview to patch preview after execution ── */
+  if (typeof window.simPreview === 'function') {
+    var _origSimPreview3 = window.simPreview;
+    window.simPreview = function() {
+      var r = _origSimPreview3.apply(this, arguments);
+      setTimeout(_patchSimFragments, 80);
+      return r;
+    };
+  }
+
+  /* ── Hook into applyI18n ── */
+  var _prevApplyV3 = window.applyI18n;
+  window.applyI18n = function(code) {
+    var r;
+    try { if (typeof _prevApplyV3 === 'function') r = _prevApplyV3.apply(this, arguments); } catch(e){}
+    try { _reMerge3(); } catch(e){}
+    try { if (typeof window._translateTextNodes === 'function') window._translateTextNodes(document.body); } catch(e){}
+    try { if (typeof window._translateAttributes === 'function') window._translateAttributes(); } catch(e){}
+    try { _patchSimFragments(); } catch(e){}
+    return r;
+  };
+
+  /* ── Run immediately ── */
+  _reMerge3();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      _reMerge3();
+      if (typeof window._translateTextNodes === 'function') window._translateTextNodes(document.body);
+      if (typeof window._translateAttributes === 'function') window._translateAttributes();
+    });
+  } else {
+    if (typeof window._translateTextNodes === 'function') window._translateTextNodes(document.body);
+    if (typeof window._translateAttributes === 'function') window._translateAttributes();
+  }
+
+  setTimeout(function(){ _reMerge3(); if(typeof window._translateTextNodes==='function') window._translateTextNodes(document.body); if(typeof window._translateAttributes==='function') window._translateAttributes(); }, 1200);
+  setTimeout(function(){ _reMerge3(); if(typeof window._translateTextNodes==='function') window._translateTextNodes(document.body); if(typeof window._translateAttributes==='function') window._translateAttributes(); _patchSimFragments(); }, 2500);
 
 })();
 </script>
