@@ -35,6 +35,7 @@ let _realtimeChannel = null;
 let _fbInitialized = false;
 let _currentLanguage = 'pt-BR';
 let i18nStrings = {};
+let i18nFlatDict = {}; // texto literal (pt-BR) -> tradução, montado a partir da tabela `translations`
 let DEC = 4;
 const S = { data: [], lsl: null, usl: null, target: null, specType: 'bilateral' };
 const CH = { hist: null, ic: null, mr: null, box: null, qq: null, cpktrend: null };
@@ -108,6 +109,35 @@ function initSupabaseClient() {
         
         i18nStrings = newStrings;
         _currentLanguage = languageCode;
+
+        // ------------------------------------------------------------
+        // Dicionário "texto literal → tradução", usado por
+        // _translateTextNodes() para traduzir texto solto no HTML que
+        // NÃO possui atributo data-i18n. A tabela `translations` guarda
+        // as chaves em formato "nav.dashboard", então precisamos cruzar
+        // cada chave com o valor em pt-BR (idioma-fonte) para saber qual
+        // texto literal em português ela representa.
+        // ------------------------------------------------------------
+        i18nFlatDict = {};
+        if (languageCode === 'pt-BR') {
+          data.forEach(function(row) { i18nFlatDict[row.value] = row.value; });
+        } else {
+          try {
+            var ptRes = await supabaseClient
+              .from('translations')
+              .select('key, value')
+              .eq('language_code', 'pt-BR');
+            var ptByKey = {};
+            (ptRes.data || []).forEach(function(row) { ptByKey[row.key] = row.value; });
+            data.forEach(function(row) {
+              var ptText = ptByKey[row.key];
+              if (ptText) i18nFlatDict[ptText] = row.value;
+            });
+          } catch (e2) {
+            console.warn('[i18n] Falha ao montar dicionário literal (pt-BR):', e2.message);
+          }
+        }
+
         return true;
       } catch (e) {
         console.error('[i18n] ❌', e.message);
@@ -192,7 +222,10 @@ function initSupabaseClient() {
       //    idioma atual — permite adicionar QUALQUER idioma novo (chinês,
       //    italiano, francês...) só inserindo linhas na tabela, sem
       //    precisar editar código.
-      var dbDict = (i18nStrings && typeof i18nStrings === 'object') ? i18nStrings : null;
+      // 1b) Dicionário "texto literal -> tradução" derivado da tabela do
+      //    banco (ver loadTranslationsFromDatabase). Este é o dicionário
+      //    que de fato bate com o texto visível no HTML.
+      var dbDict = (i18nFlatDict && typeof i18nFlatDict === 'object' && Object.keys(i18nFlatDict).length) ? i18nFlatDict : null;
       // 2) Dicionário embutido no código, usado como fallback quando a
       //    tabela ainda não tem aquela chave/idioma.
       var builtinDict = window._DYNTRAD && window._DYNTRAD[lang];
@@ -233,7 +266,9 @@ function initSupabaseClient() {
 
       document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach(function(el) {
         var ph = el.getAttribute('placeholder');
-        if (ph && dict[ph]) el.setAttribute('placeholder', dict[ph]);
+        if (!ph) return;
+        var trPh = (dbDict && dbDict[ph]) || (builtinDict && builtinDict[ph]);
+        if (trPh) el.setAttribute('placeholder', trPh);
       });
     };
 
