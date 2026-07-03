@@ -3755,6 +3755,23 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') cmClo
    DASHBOARD RENDER
    ============================================================ */
 function renderDashboard() {
+  // Trava de reentrância: como renderDashboard() é chamado de vários
+  // pontos assíncronos (carga inicial, listener em tempo real, troca de
+  // planta, troca de idioma, troca de página), chamadas simultâneas
+  // podem colidir. Enfileira uma única re-execução ao final, se necessário.
+  if (window.__dashRenderRunning) { window.__dashRenderPending = true; return; }
+  window.__dashRenderRunning = true;
+  try {
+    _renderDashboardInner();
+  } finally {
+    window.__dashRenderRunning = false;
+    if (window.__dashRenderPending) {
+      window.__dashRenderPending = false;
+      setTimeout(renderDashboard, 0);
+    }
+  }
+}
+function _renderDashboardInner() {
   if (_dashView === 'clean') { renderCMDash(); return; }
   var all = STUDIES.slice();
   var total = all.length;
