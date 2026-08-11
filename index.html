@@ -3368,17 +3368,17 @@ body {
         <thead><tr style="background:var(--s1);position:sticky;top:0">
           <th style="padding:7px 10px;text-align:center;width:36px"><input type="checkbox" id="auditorCheckAll" onchange="_auditorSelectAll(this.checked)"/></th>
           <th style="padding:7px 10px;text-align:left">PN / Código</th>
-          <th style="padding:7px 10px;text-align:left">Característica</th>
+          <th style="padding:7px 10px;text-align:left">Nome do Produto</th>
+          <th style="padding:7px 10px;text-align:left">Característica (Código)</th>
           <th style="padding:7px 10px;text-align:right;font-family:var(--mono)">N</th>
           <th style="padding:7px 10px;text-align:right;font-family:var(--mono)">Cpk</th>
           <th style="padding:7px 10px;text-align:center">Status</th>
-          <th style="padding:7px 10px;text-align:left">Data</th>
         </tr></thead>
         <tbody id="auditorStudyList"></tbody>
       </table>
     </div>
     <div style="margin-top:10px;padding:8px 10px;background:var(--s1);border:1px solid var(--s3);border-radius:var(--r);font-size:10.5px;color:var(--t2)">
-      <strong>Colunas impressas:</strong> PN · Característica · N · LSL · USL · Cp · Cpk · Pp · Ppk · σ̂ · PPM estimado · Estabilidade · Status · Data
+      <strong>Colunas impressas:</strong> PN · Nome do Produto · Característica (Código) · N · LSL · USL · Cp · Cpk · Pp · Ppk · σ̂ · PPM estimado · Estabilidade · Status
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeAuditorModal()">Fechar</button>
@@ -6106,14 +6106,15 @@ function _renderAuditorList(){
     var cls=studyClass(st.Cpk);
     var date=s.savedAt?new Date(s.savedAt).toLocaleDateString('pt-BR'):(s.date||'—');
     var n=s.data?s.data.length:(st.n||'—');
+    var charLabel=(s.cn||'—')+(s.cc?' ('+s.cc+')':'');
     return '<tr style="border-bottom:1px solid var(--s3)">'+
       '<td style="padding:6px 10px;text-align:center"><input type="checkbox" class="aud-cb" data-id="'+s.id+'" onchange="_auditorUpdateCount()"/></td>'+
       '<td style="padding:6px 10px;font-family:var(--mono);font-size:11px">'+(s.pn||'—')+'</td>'+
-      '<td style="padding:6px 10px;color:var(--t1)">'+(s.cn||s.pname||'—')+'</td>'+
+      '<td style="padding:6px 10px;color:var(--t1)">'+(s.pname||'—')+'</td>'+
+      '<td style="padding:6px 10px;color:var(--t1)">'+charLabel+'</td>'+
       '<td style="padding:6px 10px;text-align:right;font-family:var(--mono)">'+n+'</td>'+
       '<td style="padding:6px 10px;text-align:right;font-family:var(--mono);font-weight:700;color:'+cls.color+'">'+cpk+'</td>'+
       '<td style="padding:6px 10px;text-align:center"><span class="cpill '+cls.pill+'" style="font-size:9px">'+cls.label+'</span></td>'+
-      '<td style="padding:6px 10px;color:var(--t2);font-size:11px">'+date+'</td>'+
     '</tr>';
   }).join('');
   _auditorUpdateCount();
@@ -6155,9 +6156,11 @@ function printAuditorReport(){
     var n=s.data?s.data.length:(st.n||'—');
     var stab=st.stable!=null?(st.stable?'✓ Estável':'⚠ Instável'):'—';
     var bg=i%2===1?'background:#f7f8fc':'';
+    var charLabel=(s.cn||'—')+(s.cc?' ('+s.cc+')':'');
     return '<tr style="'+bg+'">'+
       '<td style="padding:4px 6px;font-family:monospace;font-size:8px;font-weight:700">'+(s.pn||'—')+'</td>'+
-      '<td style="padding:4px 6px;font-size:8px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(s.cn||s.pname||'—')+'</td>'+
+      '<td style="padding:4px 6px;font-size:8px;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(s.pname||'—')+'</td>'+
+      '<td style="padding:4px 6px;font-size:8px;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+charLabel+'</td>'+
       '<td style="padding:4px 6px;text-align:center;font-family:monospace;font-size:8px">'+n+'</td>'+
       '<td style="padding:4px 6px;text-align:center;font-family:monospace;font-size:8px">'+(s.lsl!=null?_f(s.lsl,4):'—')+'</td>'+
       '<td style="padding:4px 6px;text-align:center;font-family:monospace;font-size:8px">'+(s.usl!=null?_f(s.usl,4):'—')+'</td>'+
@@ -6169,7 +6172,6 @@ function printAuditorReport(){
       '<td style="padding:4px 6px;text-align:center;font-size:8px">'+(st.ppm!=null?Math.round(st.ppm).toLocaleString('pt-BR'):'—')+'</td>'+
       '<td style="padding:4px 6px;text-align:center;font-size:8px;color:'+(st.stable?'#1e7e34':'#b0281c')+'">'+stab+'</td>'+
       '<td style="padding:4px 6px;text-align:center;font-size:8px;background:'+cls.bg+';color:'+cls.color+';font-weight:700">'+cls.label+'</td>'+
-      '<td style="padding:4px 6px;text-align:center;font-size:8px;color:#6c757d">'+date+'</td>'+
     '</tr>';
   }).join('');
   var html='<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">'+
@@ -6181,7 +6183,7 @@ function printAuditorReport(){
     '.sum{display:flex;gap:6px;margin-bottom:6px}.sb{padding:4px 10px;border-radius:4px;font-size:8px;font-weight:700;border:1px solid}'+
     'table{width:100%;border-collapse:collapse}'+
     'th{padding:4px 6px;text-align:center;font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;background:#1565C0;color:#fff;white-space:nowrap}'+
-    'th:first-child,th:nth-child(2){text-align:left}td{border-bottom:1px solid #dee2e6}'+
+    'th:first-child,th:nth-child(2),th:nth-child(3){text-align:left}td{border-bottom:1px solid #dee2e6}'+
     'tr:last-child td{border-bottom:none}'+
     '.ft{margin-top:6px;border-top:1px solid #dee2e6;padding-top:4px;display:flex;justify-content:space-between;font-size:7px;color:#888}'+
     '.ref{margin-top:5px;font-size:7px;color:#5a6280;line-height:1.6}</style></head><body>'+
@@ -6195,8 +6197,8 @@ function printAuditorReport(){
     '<div class="sb" style="background:#fbe9e7;color:#b0281c;border-color:#f0b8b1">❌ Reprovado (Cpk<1.00): '+cntF+'</div>'+
     '</div>'+
     '<table><thead><tr>'+
-    '<th>PN / Código</th><th>Característica</th><th>N</th><th>LSL</th><th>USL</th>'+
-    '<th>Cp</th><th>Cpk</th><th>Pp</th><th>Ppk</th><th>σ̂</th><th>PPM est.</th><th>Estabilidade</th><th>Status</th><th>Data</th>'+
+    '<th>PN / Código</th><th>Nome do Produto</th><th>Característica (Código)</th><th>N</th><th>LSL</th><th>USL</th>'+
+    '<th>Cp</th><th>Cpk</th><th>Pp</th><th>Ppk</th><th>σ̂</th><th>PPM est.</th><th>Estabilidade</th><th>Status</th>'+
     '</tr></thead><tbody>'+rows+'</tbody></table>'+
     '<div class="ref"><strong>Referências:</strong> Cp/Cpk=within (σ̂ via amplitudes R̄/S̄); Pp/Ppk=overall (σ global); PPM=estimado pela distribuição normal; Estável=sem violações no I-MR.</div>'+
     '<div class="ft"><span>Röchling · Estudo CP&amp;CPK — Pro · Padrão AIAG / ISO 22514</span><span>'+now+'</span></div>'+
@@ -7341,17 +7343,26 @@ async function buildPDF(pd) {
   doc.rect(0, 28.8, W, 0.3, 'F');
 
   var __brand = (typeof window !== 'undefined' && window.__companyBranding) ? window.__companyBranding : null;
+  // Usa o logo customizado (se houver); senão cai para o logo padrão do
+  // app (window.__defaultLogoDataUrl), em vez de ir direto para o ícone
+  // genérico — é por isso que o logo não aparecia na impressão/PDF dos
+  // estudos quando nenhuma marca própria havia sido configurada.
+  var __logoForPdf = (__brand && __brand.logoDataUrl)
+    || (typeof window !== 'undefined' && window.__companyLogo)
+    || (typeof window !== 'undefined' && window.__defaultLogoDataUrl)
+    || '';
   var lx = M,
     ly = 4,
     lsc = 0.14;
   var sepX = lx + 38 * lsc + 34;
   var appX = lx + 38 * lsc + 37;
-  if (__brand && __brand.logoDataUrl) {
+  if (__logoForPdf) {
     try {
-      var fmt = (__brand.logoDataUrl.indexOf('image/jpeg') >= 0 || __brand.logoDataUrl.indexOf('image/jpg') >= 0) ? 'JPEG' : 'PNG';
-      doc.addImage(__brand.logoDataUrl, fmt, lx, ly, 22, 12);
-    } catch (e) { console.warn('[PDF] logo customizado falhou:', e); }
-  } else {
+      var fmt = (__logoForPdf.indexOf('image/jpeg') >= 0 || __logoForPdf.indexOf('image/jpg') >= 0) ? 'JPEG' : 'PNG';
+      doc.addImage(__logoForPdf, fmt, lx, ly, 22, 12);
+    } catch (e) { console.warn('[PDF] logo falhou, usando ícone padrão:', e); __logoForPdf = ''; }
+  }
+  if (!__logoForPdf) {
     doc.setFillColor(21, 101, 192);
     doc.roundedRect(lx, ly, 8 * lsc, 44 * lsc, 1.5, 1.5, 'F');
     doc.roundedRect(lx, ly, 30 * lsc, 8 * lsc, 2, 2, 'F');
