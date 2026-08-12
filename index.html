@@ -1485,6 +1485,31 @@ select { cursor: pointer; appearance: none; background-image: url("data:image/sv
 .scs-val { font-family: var(--mono); font-size: 16px; font-weight: 600; display: block; }
 .scs-lbl { font-size: 9px; color: var(--t3); text-transform: uppercase; letter-spacing: .5px; }
 .study-card-actions { display: flex; gap: 6px; margin-top: 12px; }
+
+.product-group { margin-bottom: 22px; }
+.product-group-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; background: var(--s1); border: 1px solid var(--s3);
+  border-radius: var(--r2); cursor: pointer; margin-bottom: 12px; gap: 12px;
+  flex-wrap: wrap; transition: var(--tr);
+}
+.product-group-header:hover { border-color: var(--blue-m); }
+.product-group-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.product-group-toggle-icon {
+  font-size: 11px; color: var(--t2); transition: transform .18s; flex-shrink: 0;
+  display: inline-block;
+}
+.product-group.collapsed .product-group-toggle-icon { transform: rotate(-90deg); }
+.product-group.collapsed .studies-grid { display: none; }
+.product-group-name { font-size: 13.5px; font-weight: 700; color: var(--t0); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.product-group-pn { font-family: var(--mono); font-size: 11px; color: var(--t2); font-weight: 500; flex-shrink: 0; }
+.product-group-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.product-group-badges { display: flex; gap: 8px; font-size: 10.5px; color: var(--t2); }
+.product-group-badges span { display: inline-flex; align-items: center; gap: 3px; }
+.product-group-count {
+  background: var(--blue-m); color: #fff; font-size: 10.5px; font-weight: 700;
+  border-radius: 20px; padding: 3px 11px; white-space: nowrap;
+}
 .empty-studies {
   text-align: center; padding: 60px 20px;
   background: var(--s0); border: 1px solid var(--s3); border-radius: var(--r2);
@@ -3317,8 +3342,10 @@ body {
     <div class="studies-page">
       <div class="studies-toolbar">
         <h2>📁 Estudos Salvos</h2>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;align-items:center">
           <input type="text" id="studySearch" placeholder="Buscar por PN, nome…" style="width:220px" oninput="renderStudiesList()"/>
+          <button class="btn btn-ghost btn-xs" id="btnGroupToggle" onclick="toggleGroupByProduct()" style="white-space:nowrap"></button>
+          <button class="btn btn-ghost btn-xs" id="btnExpandCollapseAll" onclick="toggleExpandCollapseAll()" style="white-space:nowrap"></button>
         </div>
       </div>
       <div id="studiesList"></div>
@@ -6937,6 +6964,102 @@ async function clearAllStudies() {
 /* ============================================================
    STUDIES LIST
    ============================================================ */
+// ============================================================
+// AGRUPAMENTO DE ESTUDOS POR PRODUTO
+// (Um mesmo produto normalmente possui várias cotas de
+// capabilidade — uma por característica estudada — então a
+// lista pode ser agrupada por Código do Produto para facilitar
+// a organização e a leitura.)
+// ============================================================
+var _groupByProduct = (localStorage.getItem('spc_group_by_product') !== '0'); // padrão: agrupado
+var _collapsedGroups = JSON.parse(localStorage.getItem('spc_collapsed_groups') || '{}');
+
+function toggleGroupByProduct() {
+  _groupByProduct = !_groupByProduct;
+  localStorage.setItem('spc_group_by_product', _groupByProduct ? '1' : '0');
+  renderStudiesList();
+}
+
+function toggleProductGroup(encKey) {
+  var key = decodeURIComponent(encKey);
+  _collapsedGroups[key] = !_collapsedGroups[key];
+  localStorage.setItem('spc_collapsed_groups', JSON.stringify(_collapsedGroups));
+  renderStudiesList();
+}
+
+function toggleExpandCollapseAll() {
+  // Se existir ao menos um grupo aberto, recolhe todos; senão, expande todos.
+  var groups = groupStudiesByProduct(STUDIES);
+  var anyOpen = groups.some(function(g) { return !_collapsedGroups[g.key]; });
+  groups.forEach(function(g) { _collapsedGroups[g.key] = anyOpen; });
+  localStorage.setItem('spc_collapsed_groups', JSON.stringify(_collapsedGroups));
+  renderStudiesList();
+}
+
+function groupStudiesByProduct(list) {
+  var groups = {};
+  var order = [];
+  list.forEach(function(s) {
+    var pnTrim = (s.pn || '').trim();
+    var key = pnTrim ? 'pn:' + pnTrim : 'name:' + (s.pname || 'Sem código').trim();
+    if (!groups[key]) {
+      groups[key] = { key: key, pn: pnTrim, pname: s.pname || '', items: [] };
+      order.push(key);
+    }
+    groups[key].items.push(s);
+    if (!groups[key].pname && s.pname) groups[key].pname = s.pname;
+  });
+  return order.map(function(k) { return groups[k]; });
+}
+
+function _studyCardHTML(s) {
+  var st = s.stats;
+  var cls = st.Cpk == null ? '' : st.Cpk >= 1.67 ? 'ok' : st.Cpk >= 1.33 ? 'warn' : 'fail';
+  var kColor = cls === 'ok' ? 'var(--ok)' : cls === 'warn' ? 'var(--warn)' : 'var(--fail)';
+  var savedDate = new Date(s.savedAt).toLocaleDateString('pt-BR');
+  return '<div class="study-card" onclick="openStudyModal(\'' + s.id + '\')">' +
+    '<div class="study-card-top"><div><div class="study-card-name">' + (s.pname || 'Sem nome') + '</div><div class="study-card-pn">' + (s.pn || '—') + ' · ' + (s.cn || '—') + '</div></div><div class="badge badge-' + (cls || 'dim') + '">' + (cls === 'ok' ? 'Capaz' : cls === 'warn' ? 'Monitor' : cls === 'fail' ? 'Não Capaz' : '—') + '</div></div>' +
+    '<div style="font-size:10.5px;color:var(--t2);margin-bottom:8px">👤 ' + (s.owner || '—') + ' &nbsp;·&nbsp; 📅 ' + (s.date || '—') + ' &nbsp;·&nbsp; N=' + st.n + '</div>' +
+    '<div class="study-card-stats"><div class="scs"><span class="scs-val" style="color:' + kColor + '">' + (st.Cpk != null ? st.Cpk.toFixed(3) : '—') + '</span><span class="scs-lbl">Cpk</span></div>' +
+    '<div class="scs"><span class="scs-val" style="color:' + kColor + '">' + (st.Cp != null ? st.Cp.toFixed(3) : '—') + '</span><span class="scs-lbl">Cp</span></div>' +
+    '<div class="scs"><span class="scs-val" style="color:' + (st.oos > 0 ? 'var(--fail)' : 'var(--ok)') + '">' + st.oos + '</span><span class="scs-lbl">Fora Esp.</span></div></div>' +
+    '<div class="study-card-actions" onclick="event.stopPropagation()">' +
+    '<button class="btn btn-primary btn-xs" onclick="loadStudyToEditor(\'' + s.id + '\')">✏ Editar</button>' +
+    '<button class="btn btn-ghost btn-xs" onclick="openStudyModal(\'' + s.id + '\')">👁 Ver</button>' +
+    '<button class="btn btn-ghost btn-xs" onclick="exportStudyPDFById(\'' + s.id + '\')">📄 PDF</button>' +
+    '<button class="btn btn-danger btn-xs" onclick="deleteStudyById(\'' + s.id + '\')">✕</button></div>' +
+    '<div style="font-size:9.5px;color:var(--t3);margin-top:8px;padding-top:6px;border-top:1px solid var(--s2)">Salvo: ' + savedDate + '</div></div>';
+}
+
+function _productGroupHTML(g) {
+  var collapsed = !!_collapsedGroups[g.key];
+  var ok = 0, warn = 0, fail = 0;
+  g.items.forEach(function(s) {
+    var k = s.stats.Cpk;
+    if (k == null) return;
+    if (k >= 1.67) ok++; else if (k >= 1.33) warn++; else fail++;
+  });
+  var encKey = encodeURIComponent(g.key);
+  return '<div class="product-group' + (collapsed ? ' collapsed' : '') + '">' +
+    '<div class="product-group-header" onclick="toggleProductGroup(\'' + encKey + '\')">' +
+      '<div class="product-group-title">' +
+        '<span class="product-group-toggle-icon">▾</span>' +
+        '<span class="product-group-name">' + (g.pname || 'Sem nome') + '</span>' +
+        '<span class="product-group-pn">' + (g.pn || '—') + '</span>' +
+      '</div>' +
+      '<div class="product-group-right">' +
+        '<div class="product-group-badges">' +
+          '<span style="color:var(--ok)">✅ ' + ok + '</span>' +
+          '<span style="color:var(--warn)">⚠ ' + warn + '</span>' +
+          '<span style="color:var(--fail)">✕ ' + fail + '</span>' +
+        '</div>' +
+        '<div class="product-group-count">' + g.items.length + ' cota' + (g.items.length === 1 ? '' : 's') + ' de capabilidade</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="studies-grid">' + g.items.map(_studyCardHTML).join('') + '</div>' +
+  '</div>';
+}
+
 function renderStudiesList() {
   var list = document.getElementById('studiesList');
   var q = (document.getElementById('studySearch') && document.getElementById('studySearch').value || '').toLowerCase();
@@ -6944,6 +7067,16 @@ function renderStudiesList() {
     if (!q) return true;
     return (s.pn + s.pname + s.cn + s.owner).toLowerCase().includes(q);
   }).sort(function(a, b) { return new Date(b.savedAt) - new Date(a.savedAt); });
+
+  var btnGroup = document.getElementById('btnGroupToggle');
+  if (btnGroup) btnGroup.textContent = _groupByProduct ? '📦 Agrupado por Produto' : '📋 Ver por Produto';
+  var btnExp = document.getElementById('btnExpandCollapseAll');
+  if (btnExp) btnExp.style.display = _groupByProduct ? '' : 'none';
+  if (btnExp) {
+    var groupsAll = groupStudiesByProduct(STUDIES);
+    var anyOpen = groupsAll.some(function(g) { return !_collapsedGroups[g.key]; });
+    btnExp.textContent = anyOpen ? '⯆ Recolher tudo' : '⯈ Expandir tudo';
+  }
 
   if (!filtered.length) {
     list.innerHTML = '<div class="empty-studies">' +
@@ -6954,24 +7087,12 @@ function renderStudiesList() {
     return;
   }
 
-  list.innerHTML = '<div class="studies-grid">' + filtered.map(function(s) {
-    var st = s.stats;
-    var cls = st.Cpk == null ? '' : st.Cpk >= 1.67 ? 'ok' : st.Cpk >= 1.33 ? 'warn' : 'fail';
-    var kColor = cls === 'ok' ? 'var(--ok)' : cls === 'warn' ? 'var(--warn)' : 'var(--fail)';
-    var savedDate = new Date(s.savedAt).toLocaleDateString('pt-BR');
-    return '<div class="study-card" onclick="openStudyModal(\'' + s.id + '\')">' +
-      '<div class="study-card-top"><div><div class="study-card-name">' + (s.pname || 'Sem nome') + '</div><div class="study-card-pn">' + (s.pn || '—') + ' · ' + (s.cn || '—') + '</div></div><div class="badge badge-' + (cls || 'dim') + '">' + (cls === 'ok' ? 'Capaz' : cls === 'warn' ? 'Monitor' : cls === 'fail' ? 'Não Capaz' : '—') + '</div></div>' +
-      '<div style="font-size:10.5px;color:var(--t2);margin-bottom:8px">👤 ' + (s.owner || '—') + ' &nbsp;·&nbsp; 📅 ' + (s.date || '—') + ' &nbsp;·&nbsp; N=' + st.n + '</div>' +
-      '<div class="study-card-stats"><div class="scs"><span class="scs-val" style="color:' + kColor + '">' + (st.Cpk != null ? st.Cpk.toFixed(3) : '—') + '</span><span class="scs-lbl">Cpk</span></div>' +
-      '<div class="scs"><span class="scs-val" style="color:' + kColor + '">' + (st.Cp != null ? st.Cp.toFixed(3) : '—') + '</span><span class="scs-lbl">Cp</span></div>' +
-      '<div class="scs"><span class="scs-val" style="color:' + (st.oos > 0 ? 'var(--fail)' : 'var(--ok)') + '">' + st.oos + '</span><span class="scs-lbl">Fora Esp.</span></div></div>' +
-      '<div class="study-card-actions" onclick="event.stopPropagation()">' +
-      '<button class="btn btn-primary btn-xs" onclick="loadStudyToEditor(\'' + s.id + '\')">✏ Editar</button>' +
-      '<button class="btn btn-ghost btn-xs" onclick="openStudyModal(\'' + s.id + '\')">👁 Ver</button>' +
-      '<button class="btn btn-ghost btn-xs" onclick="exportStudyPDFById(\'' + s.id + '\')">📄 PDF</button>' +
-      '<button class="btn btn-danger btn-xs" onclick="deleteStudyById(\'' + s.id + '\')">✕</button></div>' +
-      '<div style="font-size:9.5px;color:var(--t3);margin-top:8px;padding-top:6px;border-top:1px solid var(--s2)">Salvo: ' + savedDate + '</div></div>';
-  }).join('') + '</div>';
+  if (_groupByProduct) {
+    var groups = groupStudiesByProduct(filtered);
+    list.innerHTML = groups.map(_productGroupHTML).join('');
+  } else {
+    list.innerHTML = '<div class="studies-grid">' + filtered.map(_studyCardHTML).join('') + '</div>';
+  }
   try { if (typeof window.applyI18nToDOM === 'function') window.applyI18nToDOM(); } catch (e) {}
 }
 
